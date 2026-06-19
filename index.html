@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目部人员到岗离岗统计与绩效分配系统</title>
+<style>
+  :root{
+    --bg:#0e1525;
+    --bg2:#131c30;
+    --panel:rgba(255,255,255,0.04);
+    --panel-solid:#18223a;
+    --line:rgba(255,255,255,0.08);
+    --line-strong:rgba(255,255,255,0.16);
+    --txt:#e8edf7;
+    --txt-dim:#9aa7c2;
+    --txt-mut:#6b7896;
+    --gold:#e8b04b;
+    --gold-soft:#f0c878;
+    --teal:#39c6c0;
+    --blue:#5b8def;
+    --green:#46c98b;
+    --red:#ef6b6b;
+    --purple:#a07bf0;
+    --radius:16px;
+    --shadow:0 10px 40px rgba(0,0,0,.35);
+    --font:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font);
+    color:var(--txt);
+    background:
+      radial-gradient(1200px 700px at 12% -8%,rgba(91,141,239,.16),transparent 60%),
+      radial-gradient(1000px 600px at 100% 0%,rgba(232,176,75,.12),transparent 55%),
+      linear-gradient(180deg,var(--bg),var(--bg2));
+    background-attachment:fixed;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    font-size:14px;
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2)}
+
+  /* ===== Top bar ===== */
+  header{
+    display:flex;align-items:center;gap:16px;
+    padding:18px 28px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.04),transparent);
+    backdrop-filter:blur(8px);
+    position:sticky;top:0;z-index:50;
+  }
+  .logo{
+    width:46px;height:46px;border-radius:12px;flex:none;
+    background:linear-gradient(135deg,var(--gold),#c8862b);
+    display:grid;place-items:center;font-weight:800;color:#1a1205;font-size:20px;
+    box-shadow:0 6px 18px rgba(232,176,75,.35);
+  }
+  .title-wrap h1{font-size:19px;font-weight:700;letter-spacing:.5px}
+  .title-wrap p{font-size:12px;color:var(--txt-dim);margin-top:2px}
+  header .spacer{flex:1}
+  .toolbtn{
+    border:1px solid var(--line-strong);background:var(--panel);color:var(--txt);
+    padding:9px 14px;border-radius:10px;cursor:pointer;font-size:13px;
+    display:inline-flex;align-items:center;gap:7px;transition:.15s;
+  }
+  .toolbtn:hover{background:rgba(255,255,255,.1);border-color:var(--line-strong)}
+  .toolbtn.gold{background:linear-gradient(135deg,var(--gold),#cf972f);border-color:transparent;color:#241803;font-weight:600}
+  .toolbtn.gold:hover{filter:brightness(1.08)}
+
+  /* ===== Layout ===== */
+  .shell{display:flex;min-height:calc(100vh - 83px)}
+  nav{
+    width:208px;flex:none;padding:18px 14px;border-right:1px solid var(--line);
+    position:sticky;top:83px;height:calc(100vh - 83px);overflow:auto;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;
+    cursor:pointer;color:var(--txt-dim);font-size:13.5px;margin-bottom:4px;transition:.15s;
+    border:1px solid transparent;
+  }
+  .nav-item .ic{width:18px;text-align:center;font-size:15px}
+  .nav-item:hover{background:var(--panel);color:var(--txt)}
+  .nav-item.active{background:linear-gradient(135deg,rgba(232,176,75,.18),rgba(232,176,75,.06));color:var(--gold-soft);border-color:rgba(232,176,75,.25);font-weight:600}
+  .nav-sep{font-size:11px;color:var(--txt-mut);padding:14px 13px 6px;letter-spacing:1px}
+
+  main{flex:1;padding:26px 30px;overflow:auto}
+  .page{display:none;animation:fade .25s ease}
+  .page.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .page-head h2{font-size:22px;font-weight:700}
+  .page-head .sub{color:var(--txt-dim);font-size:13px;margin-top:4px}
+
+  /* ===== Cards ===== */
+  .grid{display:grid;gap:16px}
+  .cards-4{grid-template-columns:repeat(4,1fr)}
+  .cards-3{grid-template-columns:repeat(3,1fr)}
+  .cards-2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:1100px){.cards-4{grid-template-columns:repeat(2,1fr)}.cards-3{grid-template-columns:repeat(2,1fr)}}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;backdrop-filter:blur(6px);
+  }
+  .stat{position:relative;overflow:hidden}
+  .stat .label{font-size:12.5px;color:var(--txt-dim);display:flex;align-items:center;gap:7px}
+  .stat .val{font-size:30px;font-weight:800;margin-top:10px;letter-spacing:.5px}
+  .stat .unit{font-size:14px;font-weight:600;color:var(--txt-dim);margin-left:4px}
+  .stat .foot{font-size:12px;color:var(--txt-mut);margin-top:6px}
+  .stat .badge-ic{position:absolute;right:16px;top:16px;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:19px}
+  .bi-gold{background:rgba(232,176,75,.15);color:var(--gold)}
+  .bi-teal{background:rgba(57,198,192,.15);color:var(--teal)}
+  .bi-blue{background:rgba(91,141,239,.15);color:var(--blue)}
+  .bi-green{background:rgba(70,201,139,.15);color:var(--green)}
+  .bi-purple{background:rgba(160,123,240,.15);color:var(--purple)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px}
+  .panel h3{font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .panel .desc{font-size:12.5px;color:var(--txt-dim);margin-bottom:16px}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+  .panel-head h3{margin-bottom:0}
+
+  /* ===== Tables ===== */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--txt-dim);font-weight:600;font-size:12px;letter-spacing:.4px;white-space:nowrap;background:rgba(255,255,255,.02)}
+  tbody tr{transition:.12s}
+  tbody tr:hover{background:rgba(255,255,255,.03)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line)}
+
+  /* ===== Forms ===== */
+  input,select{
+    background:var(--bg);border:1px solid var(--line-strong);color:var(--txt);
+    padding:9px 11px;border-radius:9px;font-size:13px;font-family:var(--font);outline:none;transition:.15s;width:100%;
+  }
+  input:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,176,75,.12)}
+  input[type=date]{color-scheme:dark}
+  label.fld{display:block;font-size:12px;color:var(--txt-dim);margin-bottom:6px}
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .form-row > div{flex:1;min-width:130px}
+  .btn{
+    border:none;border-radius:9px;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;
+    font-family:var(--font);transition:.15s;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  }
+  .btn-gold{background:linear-gradient(135deg,var(--gold),#cf972f);color:#241803}
+  .btn-gold:hover{filter:brightness(1.08)}
+  .btn-ghost{background:var(--panel);border:1px solid var(--line-strong);color:var(--txt)}
+  .btn-ghost:hover{background:rgba(255,255,255,.1)}
+  .btn-danger{background:rgba(239,107,107,.12);color:var(--red);border:1px solid rgba(239,107,107,.3)}
+  .btn-danger:hover{background:rgba(239,107,107,.2)}
+  .btn-sm{padding:6px 11px;font-size:12px}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--txt-mut);font-size:15px;padding:4px 7px;border-radius:7px;transition:.12s}
+  .icon-btn:hover{background:rgba(255,255,255,.08);color:var(--txt)}
+  .icon-btn.del:hover{color:var(--red);background:rgba(239,107,107,.12)}
+
+  .tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+  .tag-on{background:rgba(70,201,139,.16);color:var(--green)}
+  .tag-off{background:rgba(107,120,150,.18);color:var(--txt-dim)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;background:rgba(255,255,255,.06);color:var(--txt-dim)}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--txt-mut);font-size:13px}
+  .empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
+
+  /* bar mini chart */
+  .barrow{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+  .barrow .nm{width:96px;font-size:12.5px;color:var(--txt-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .barrow .track{flex:1;height:22px;background:rgba(255,255,255,.05);border-radius:7px;overflow:hidden}
+  .barrow .fill{height:100%;border-radius:7px;background:linear-gradient(90deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;font-weight:700;color:#fff;min-width:30px;transition:width .6s ease}
+  .barrow .vv{width:74px;text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--txt)}
+
+  /* score input cells */
+  .score-in{width:62px;padding:6px 8px;text-align:center}
+  .weight-in{width:70px;padding:6px 8px;text-align:center}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(6,10,18,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--panel-solid);border:1px solid var(--line-strong);border-radius:18px;padding:26px;width:min(520px,100%);box-shadow:var(--shadow)}
+  .modal h3{font-size:17px;margin-bottom:18px}
+
+  /* toast */
+  #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-solid);border:1px solid var(--line-strong);color:var(--txt);padding:12px 20px;border-radius:11px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:300;font-size:13px}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.ok{border-color:rgba(70,201,139,.5)}
+  #toast.err{border-color:rgba(239,107,107,.5)}
+
+  .hint{background:rgba(91,141,239,.08);border:1px solid rgba(91,141,239,.2);border-radius:11px;padding:13px 15px;font-size:12.5px;color:var(--txt-dim);line-height:1.7;margin-bottom:16px}
+  .hint b{color:var(--blue)}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line-strong);border-radius:10px;padding:3px;gap:3px}
+  .seg button{border:none;background:none;color:var(--txt-dim);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;transition:.12s}
+  .seg button.active{background:var(--gold);color:#241803}
+  .month-sel{width:auto;min-width:96px;padding:8px 10px;border-radius:10px;font-weight:600}
+  .month-sel:disabled{opacity:.45;cursor:not-allowed}
+
+  .total-bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:linear-gradient(135deg,rgba(232,176,75,.12),rgba(232,176,75,.03));border:1px solid rgba(232,176,75,.25);border-radius:12px;margin-top:14px}
+  .total-bar .t{font-size:13px;color:var(--gold-soft)}
+  .total-bar .v{font-size:22px;font-weight:800;color:var(--gold-soft)}
+
+  .money{color:var(--green);font-weight:700;font-variant-numeric:tabular-nums}
+  .scorecell{font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ===== 3D animated background (VANTA / three.js) ===== */
+  #vanta-bg{position:fixed;inset:0;z-index:-2;opacity:.85}
+  #vanta-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(1200px 700px at 12% -8%,rgba(91,141,239,.10),transparent 60%),
+      radial-gradient(1000px 600px at 100% 0%,rgba(232,176,75,.08),transparent 55%),
+      linear-gradient(180deg,rgba(14,21,37,.18),rgba(19,28,48,.42));}
+  body:not(.vanta-on) #vanta-bg,body:not(.vanta-on) #vanta-overlay{display:none}
+  /* when 3D is on, deepen glass + add depth to panels/cards */
+  body.vanta-on .panel,body.vanta-on .card{background:rgba(18,26,44,.62);backdrop-filter:blur(10px)}
+  body.vanta-on header{background:rgba(14,21,37,.55);backdrop-filter:blur(12px)}
+  body.vanta-on nav{background:rgba(14,21,37,.35);backdrop-filter:blur(10px)}
+  /* gentle 3D lift on hover */
+  .card{transition:transform .25s ease,box-shadow .25s ease}
+  .card:hover{transform:translateY(-4px) perspective(600px) rotateX(2deg);box-shadow:0 16px 38px rgba(0,0,0,.4)}
+  #bgSel{background:var(--bg);border:1px solid var(--line-strong);color:var(--txt);
+    padding:9px 10px;border-radius:10px;font-size:13px;font-family:var(--font);cursor:pointer}
+
+  /* ===== read-only (viewer) mode ===== */
+  body.readonly .edit-only{display:none!important}
+  body.readonly .icon-btn{display:none!important}
+  body.readonly .score-in{pointer-events:none;border-color:transparent;background:transparent;color:var(--txt);text-align:right;font-weight:700}
+  body.readonly #totalAmount,body.readonly #distMode{pointer-events:none;opacity:.8;background:rgba(255,255,255,.03)}
+  .ro-badge{display:none;align-items:center;gap:6px;font-size:12px;color:var(--gold-soft);
+    background:rgba(232,176,75,.14);border:1px solid rgba(232,176,75,.3);padding:7px 12px;border-radius:10px}
+  body.readonly .ro-badge{display:inline-flex}
+
+  /* ===== unlock overlay ===== */
+  .unlock-bg{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center;padding:20px;
+    background:rgba(8,12,20,.82);backdrop-filter:blur(10px)}
+  .unlock-bg.show{display:flex}
+  .unlock-card{background:var(--panel-solid);border:1px solid var(--line-strong);border-radius:20px;
+    padding:34px 30px;width:min(420px,100%);box-shadow:var(--shadow);text-align:center}
+  .unlock-card h3{font-size:18px;margin-bottom:8px}
+  .unlock-card .ulhint{font-size:12.5px;color:var(--txt-dim);line-height:1.7;margin-bottom:20px}
+  .unlock-card input{text-align:center;font-size:15px;padding:12px}
+  .unlock-card .ulerr{color:var(--red);font-size:12.5px;margin-top:12px;min-height:16px}
+  .unlock-card .ulfoot{font-size:11px;color:var(--txt-mut);margin-top:16px}
+
+  @media print{
+    nav,header,.no-print,#vanta-bg,#vanta-overlay,.unlock-bg{display:none!important}
+    main{padding:0}
+    body{background:#fff;color:#000}
+    body.vanta-on .panel,body.vanta-on .card{background:#fff;backdrop-filter:none}
+    .panel,.card{border-color:#ccc;background:#fff;break-inside:avoid}
+  }
+  @media (prefers-reduced-motion:reduce){#vanta-bg{display:none}}
+
+  /* ===== 手机 / 窄屏自适应 ===== */
+  @media (max-width:760px){
+    body{font-size:13.5px}
+    header{flex-wrap:wrap;gap:8px;padding:11px 13px;position:static}
+    .logo{width:36px;height:36px;font-size:15px;border-radius:10px}
+    .title-wrap h1{font-size:15px;line-height:1.25}
+    .title-wrap p{font-size:10.5px}
+    header .spacer{display:none}
+    .toolbtn{padding:8px 10px;font-size:12px}
+    #bgSel{padding:7px 8px;font-size:12px}
+    .ro-badge{font-size:11px;padding:6px 9px}
+
+    /* 顶部导航改为横向滚动条 */
+    .shell{flex-direction:column;min-height:0}
+    nav{width:auto;height:auto;position:sticky;top:0;display:flex;flex-wrap:nowrap;
+        overflow-x:auto;border-right:none;border-bottom:1px solid var(--line);
+        padding:8px 10px;gap:6px;z-index:40;-webkit-overflow-scrolling:touch}
+    .nav-sep{display:none}
+    .nav-item{flex:none;white-space:nowrap;margin-bottom:0;padding:9px 12px}
+    main{padding:14px 13px}
+
+    .page-head{flex-direction:column;align-items:stretch;gap:10px}
+    .page-head h2{font-size:19px}
+    .page-head .sub{font-size:12px}
+
+    /* 卡片单列、表单堆叠 */
+    .cards-4,.cards-3,.cards-2{grid-template-columns:1fr}
+    .grid{gap:12px}
+    .panel{padding:15px}
+    .stat .val{font-size:26px}
+
+    .form-row{flex-direction:column;align-items:stretch;gap:10px}
+    .form-row>div{width:100%!important;max-width:none!important;min-width:0;flex:1 1 auto}
+    .panel-head{flex-wrap:wrap}
+    .panel-head .form-row{width:100%}
+
+    th,td{padding:9px 9px;font-size:12.5px}
+    .barrow .nm{width:66px;font-size:11.5px}
+    .barrow .vv{width:54px;font-size:11.5px}
+
+    .seg{flex-wrap:wrap}
+    .month-sel{min-width:78px}
+    .total-bar{flex-direction:column;align-items:flex-start;gap:6px}
+    .modal{padding:20px}
+    .unlock-card{padding:26px 20px}
+  }
+</style>
+</head>
+<body>
+<div id="vanta-bg"></div>
+<div id="vanta-overlay"></div>
+
+<header>
+  <div class="logo">岗</div>
+  <div class="title-wrap">
+    <h1>项目部人员到岗离岗统计与绩效分配系统</h1>
+    <p>哈尔乌素二期 · 采空区治理项目 &nbsp;|&nbsp; 统计周期 2026 — 2029<span id="dataMeta"></span></p>
+  </div>
+  <div class="spacer"></div>
+  <span class="ro-badge" id="roBadge">🔒 只读模式</span>
+  <select id="bgSel" title="3D 动态背景" onchange="setBg(this.value)">
+    <option value="globe">🌐 3D 地球</option>
+    <option value="net">🕸 3D 网格</option>
+    <option value="off">⬛ 关闭动效</option>
+  </select>
+  <button class="toolbtn" onclick="exportJSON()">⬇ 备份数据</button>
+  <button class="toolbtn edit-only" onclick="document.getElementById('importFile').click()">⬆ 恢复数据</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+  <button class="toolbtn edit-only" onclick="makeShare()" title="生成加密共享文件，上传到 GitHub 供他人只读查看">🔒 生成共享</button>
+  <button class="toolbtn gold" onclick="window.print()">🖨 打印报告</button>
+</header>
+
+<div class="shell">
+  <nav>
+    <div class="nav-item active" data-page="dash"><span class="ic">📊</span>总览仪表盘</div>
+    <div class="nav-item" data-page="members"><span class="ic">👥</span>人员管理</div>
+    <div class="nav-item" data-page="records"><span class="ic">📅</span>到岗离岗记录</div>
+    <div class="nav-item" data-page="stats"><span class="ic">📈</span>统计分析</div>
+    <div class="nav-sep">绩效考核</div>
+    <div class="nav-item" data-page="perf"><span class="ic">⭐</span>绩效评分</div>
+    <div class="nav-item" data-page="dist"><span class="ic">💰</span>绩效分配</div>
+    <div class="nav-sep edit-only">系统</div>
+    <div class="nav-item edit-only" data-page="settings"><span class="ic">⚙️</span>指标设置</div>
+  </nav>
+
+  <main>
+    <!-- ===================== DASHBOARD ===================== -->
+    <section class="page active" id="page-dash">
+      <div class="page-head">
+        <div><h2>总览仪表盘</h2><div class="sub">截至 <span id="today"></span> 的项目部在岗与绩效概况</div></div>
+      </div>
+      <div class="grid cards-4" id="dashStats"></div>
+
+      <div class="grid cards-2" style="margin-top:16px">
+        <div class="panel">
+          <div class="panel-head"><h3>📍 当前在岗人员</h3></div>
+          <div id="onDutyList"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>🏆 累计在岗时长 TOP</h3></div>
+          <div id="topDays"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>📆 年度在岗人天分布（2026—2029）</h3></div>
+        <div id="yearChart"></div>
+      </div>
+    </section>
+
+    <!-- ===================== MEMBERS ===================== -->
+    <section class="page" id="page-members">
+      <div class="page-head">
+        <div><h2>人员管理</h2><div class="sub">增减项目部成员，维护基本信息</div></div>
+      </div>
+      <div class="panel edit-only">
+        <h3>➕ 新增成员</h3>
+        <div class="desc">填写后点击「添加」，成员即可用于到岗记录与绩效考核。</div>
+        <div class="form-row">
+          <div><label class="fld">姓名 *</label><input id="m_name" placeholder="如：张工"></div>
+          <div><label class="fld">岗位（决定考核指标）*</label><select id="m_role"></select></div>
+          <div><label class="fld">部门</label><select id="m_dept"></select></div>
+          <div><label class="fld">联系电话</label><input id="m_phone" placeholder="选填"></div>
+          <div style="flex:none"><button class="btn btn-gold" onclick="addMember()">添加成员</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>👥 成员名单</h3><span class="pill" id="memberCount"></span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>电话</th><th>状态</th><th class="num">本段在岗</th><th class="num">累计在岗</th><th style="text-align:center">操作</th></tr></thead>
+          <tbody id="memberBody"></tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>🏢 各单位在岗 / 离岗人数统计</h3></div>
+        <div class="desc">实时对比各单位当前在岗与离岗人数。</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>单位（部门）</th><th class="num">在岗</th><th class="num">离岗</th><th class="num">合计</th><th class="num">在岗率</th></tr></thead>
+          <tbody id="deptStatBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ===================== RECORDS ===================== -->
+    <section class="page" id="page-records">
+      <div class="page-head">
+        <div><h2>到岗离岗记录</h2><div class="sub">登记每次进出场，离岗日期留空表示「当前在岗」，系统自动实时累计</div></div>
+      </div>
+      <div class="hint">
+        💡 <b>使用说明：</b>一名成员可有多段在岗记录。<b>本次在岗时间</b>=当前未结束记录的在岗天数。
+        <b>常驻</b>：到岗至离岗按自然日全计；<b>非常驻</b>：自动扣除周末与节假日，仅计工作日，再加上登记的加班日（休息日上班）。
+        节假日时间段在下方统一设置，对所有非常驻成员生效。
+      </div>
+      <div class="panel edit-only">
+        <h3>➕ 登记记录</h3>
+        <div class="form-row">
+          <div><label class="fld">成员 *</label><select id="r_member"></select></div>
+          <div style="max-width:120px"><label class="fld">是否常驻 *</label>
+            <select id="r_resident" onchange="toggleOvertime()"><option value="1">常驻</option><option value="0">非常驻</option></select>
+          </div>
+          <div><label class="fld">到岗日期 *</label><input type="date" id="r_start"></div>
+          <div><label class="fld">离岗日期（在岗中可留空）</label><input type="date" id="r_end"></div>
+          <div><label class="fld">备注</label><input id="r_note" placeholder="如：现场驻守 / 出差返回"></div>
+          <div style="flex:none"><button class="btn btn-gold" onclick="addRecord()">登记</button></div>
+        </div>
+        <div class="form-row" id="otWrap" style="display:none;margin-top:10px">
+          <div style="flex:2"><label class="fld">加班日期（非常驻专用，多个用逗号分隔，仅周末/节假日上班才计入）</label>
+            <input id="r_overtime" placeholder="如：2026-05-01,2026-05-02,2026-10-04"></div>
+        </div>
+      </div>
+      <div class="panel edit-only">
+        <div class="panel-head">
+          <h3>🎌 节假日设置</h3>
+          <div class="form-row" style="margin:0;align-items:flex-end">
+            <div><label class="fld">开始日期</label><input type="date" id="h_start"></div>
+            <div><label class="fld">结束日期</label><input type="date" id="h_end"></div>
+            <div><label class="fld">名称</label><input id="h_name" placeholder="如：国庆节"></div>
+            <div style="flex:none"><button class="btn btn-gold btn-sm" onclick="addHoliday()">＋ 添加节假日</button></div>
+          </div>
+        </div>
+        <div class="desc">用于非常驻成员的工作日扣除（节假日期间的工作日不计在岗，除非当日登记为加班）。</div>
+        <div id="holidayList"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>📅 全部记录</h3>
+          <div class="form-row" style="margin:0;align-items:center">
+            <input id="r_search" placeholder="🔍 搜索人名…" style="width:160px" oninput="renderRecords()">
+            <select id="r_filter" style="width:160px" onchange="renderRecords()"></select>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>成员</th><th>岗位</th><th>类型</th><th>到岗</th><th>离岗</th><th class="num">本段天数</th><th>状态</th><th>备注</th><th style="text-align:center">操作</th></tr></thead>
+          <tbody id="recordBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ===================== STATS ===================== -->
+    <section class="page" id="page-stats">
+      <div class="page-head">
+        <div><h2>统计分析</h2><div class="sub">按成员 / 年度多维度统计在岗时长</div></div>
+      </div>
+      <div class="grid cards-4" id="statsCards"></div>
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-head"><h3>📊 成员累计在岗天数排名</h3></div>
+        <div id="statBars"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>📋 成员 × 年度 在岗人天明细表</h3>
+          <button class="btn btn-gold btn-sm" onclick="exportYearlyTable()">⬇ 导出年度统计表</button>
+        </div>
+        <div class="tbl-wrap"><table id="matrix">
+          <thead id="matrixHead"></thead>
+          <tbody id="matrixBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>🗓 月度在岗统计</h3>
+          <div class="form-row" style="margin:0;align-items:center">
+            <select id="monthYear" style="width:130px" onchange="renderMonthly()"></select>
+            <button class="btn btn-ghost btn-sm" onclick="exportMonthlyTable()">⬇ 导出本年月度表</button>
+            <button class="btn btn-gold btn-sm" onclick="exportMonthlyAllYears()">⬇ 导出全年度月度表</button>
+          </div>
+        </div>
+        <div class="desc">展示所选年度内，各成员每个自然月的在岗人天（跨月记录按自然月自动拆分）。</div>
+        <div class="tbl-wrap"><table id="monthMatrix">
+          <thead id="monthHead"></thead>
+          <tbody id="monthBody"></tbody>
+        </table></div>
+        <div style="margin-top:14px"><div class="panel-head"><h3 style="font-size:13.5px">📈 全员月度在岗趋势</h3></div><div id="monthBars"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>📤 导出在岗统计表</h3></div>
+        <div class="desc">统计表包含每次到岗起止日期、本次天数，以及总起止日期与总天数，可用 Excel 打开。</div>
+        <div class="form-row">
+          <div style="max-width:240px"><label class="fld">选择成员（导出单人表）</label><select id="exp_member"></select></div>
+          <div style="flex:none"><button class="btn btn-ghost" onclick="exportMemberTable()">⬇ 导出单人在岗统计表</button></div>
+          <div style="flex:none"><button class="btn btn-gold" onclick="exportAllTable()">⬇ 导出全员在岗统计表</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PERFORMANCE SCORING ===================== -->
+    <section class="page" id="page-perf">
+      <div class="page-head">
+        <div><h2>绩效评分</h2><div class="sub">系统按成员岗位自动归类，分岗位采用各自考核指标打分</div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div class="seg" id="periodSeg"></div>
+          <select id="monthSel" class="month-sel" onchange="setMonth(this.value)"></select>
+        </div>
+      </div>
+      <div class="hint">
+        💡 <b>评分规则：</b>成员按「人员管理」中的<b>岗位</b>自动归入对应考核类别，每个岗位使用各自的指标。
+        「在岗时长」得分 = 本周期在岗天数 ÷ 全员最高在岗天数 × 100（自动计算）；其余指标由考核人填写 0—100 分。
+        <b>综合得分</b> = Σ(各指标得分 × 权重)，权重在「指标设置」中按岗位调整。
+      </div>
+      <div id="perfContainer"></div>
+    </section>
+
+    <!-- ===================== DISTRIBUTION ===================== -->
+    <section class="page" id="page-dist">
+      <div class="page-head">
+        <div><h2>绩效分配</h2><div class="sub">输入绩效总金额，按综合得分占比自动分配到人；支持按年度或月度分配</div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div class="seg" id="periodSeg2"></div>
+          <select id="monthSel2" class="month-sel" onchange="setMonth(this.value)"></select>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="form-row">
+          <div style="max-width:280px"><label class="fld">绩效总金额（元）*</label><input id="totalAmount" type="number" placeholder="如：100000" oninput="renderDist()"></div>
+          <div style="max-width:220px"><label class="fld">分配方式</label>
+            <select id="distMode" onchange="renderDist()">
+              <option value="score">按综合得分占比分配（推荐）</option>
+              <option value="scoreday">综合得分 × 在岗天数 加权分配</option>
+            </select>
+          </div>
+          <div style="flex:none"><button class="btn btn-ghost" onclick="renderDist()">↻ 重新计算</button></div>
+        </div>
+        <div class="total-bar">
+          <div class="t">绩效总金额</div>
+          <div class="v" id="distTotalShow">¥ 0</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>💰 绩效分配明细</h3>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="pill" id="distPeriodLabel"></span>
+            <button class="btn btn-gold btn-sm" onclick="printPerfReport()">🖨 打印正式绩效报告</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+            <th>排名</th><th>姓名</th><th>岗位</th><th class="num">在岗天数</th>
+            <th class="num">综合得分</th><th class="num">分配权重</th><th class="num">占比</th><th class="num">绩效金额</th>
+          </tr></thead>
+          <tbody id="distBody"></tbody>
+          <tfoot id="distFoot"></tfoot>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section class="page" id="page-settings">
+      <div class="page-head">
+        <div><h2>指标设置</h2><div class="sub">按岗位分类定制绩效考核指标与权重，全部可增删改</div></div>
+      </div>
+      <div class="hint">
+        💡 <b>说明：</b>每个<b>岗位</b>拥有独立的考核指标集。每个岗位权重之和建议为 100%（系统按实际权重归一化计算）。
+        「在岗时长」为各岗位通用的系统自动指标，不可删除；其余为人工打分项，名称、说明、权重均可修改，可增删。
+        成员在「人员管理」中所选岗位决定其采用哪套指标。
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>🗂 岗位类别</h3>
+          <div class="form-row" style="margin:0;align-items:center">
+            <input id="role_new" placeholder="新增岗位名称，如：测量员" style="width:200px">
+            <button class="btn btn-gold btn-sm" onclick="addRole()">＋ 添加岗位</button>
+          </div>
+        </div>
+        <div class="seg" id="roleTabs" style="flex-wrap:wrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>⚙️ <span id="curRoleName">考核指标</span></h3>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="pill" id="weightSum"></span>
+            <button class="btn btn-danger btn-sm" id="delRoleBtn" onclick="if(curRole)delRole(curRole)">🗑 删除该岗位</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th style="width:26%">指标名称</th><th>说明</th><th class="num" style="width:110px">权重(%)</th><th style="width:60px">类型</th><th style="text-align:center;width:60px">操作</th></tr></thead>
+          <tbody id="kpiBody"></tbody>
+        </table></div>
+        <div class="form-row" style="margin-top:16px">
+          <div><label class="fld">新增指标名称</label><input id="k_name" placeholder="如：进度管控"></div>
+          <div style="flex:2"><label class="fld">说明</label><input id="k_desc" placeholder="该指标考核要点"></div>
+          <div style="max-width:120px"><label class="fld">权重(%)</label><input id="k_w" type="number" placeholder="10"></div>
+          <div style="flex:none"><button class="btn btn-gold" onclick="addKpi()">添加指标</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>🏢 部门管理</h3>
+          <div class="form-row" style="margin:0;align-items:center">
+            <input id="dept_new" placeholder="新增部门名称" style="width:200px">
+            <button class="btn btn-gold btn-sm" onclick="addDept()">＋ 添加部门</button>
+          </div>
+        </div>
+        <div class="desc">部门用于人员管理中的「部门」下拉选择，可增删。</div>
+        <div id="deptList"></div>
+      </div>
+      <div class="panel">
+        <h3>🗂 数据管理</h3>
+        <div class="desc">数据仅保存在本机浏览器中，请定期使用顶部「备份数据」导出 JSON 文件保存。</div>
+        <div class="form-row">
+          <div style="flex:none"><button class="btn btn-ghost" onclick="exportCSV()">⬇ 导出在岗明细 CSV</button></div>
+          <div style="flex:none"><button class="btn btn-ghost" onclick="loadDemo()">🧪 载入示例数据</button></div>
+          <div style="flex:none"><button class="btn btn-ghost" onclick="resetRoles()">↺ 重置岗位指标为默认</button></div>
+          <div style="flex:none"><button class="btn btn-danger" onclick="resetAll()">🗑 清空全部数据</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- edit member modal -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <h3>编辑成员</h3>
+    <input type="hidden" id="e_id">
+    <div style="display:grid;gap:13px">
+      <div><label class="fld">姓名</label><input id="e_name"></div>
+      <div><label class="fld">岗位（决定考核指标）</label><select id="e_role"></select></div>
+      <div><label class="fld">部门</label><select id="e_dept"></select></div>
+      <div><label class="fld">联系电话</label><input id="e_phone"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
+      <button class="btn btn-ghost" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-gold" onclick="saveMemberEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="unlock-bg" id="unlockBg">
+  <div class="unlock-card">
+    <div class="logo" style="margin:0 auto 14px">岗</div>
+    <h3>项目部人员统计 · 只读查看</h3>
+    <p class="ulhint">本页数据已加密保护。请输入<br>管理员提供的查看口令以解锁查看与导出。</p>
+    <input type="password" id="ulPass" placeholder="请输入查看口令" autocomplete="off" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button class="btn btn-gold" style="width:100%;justify-content:center;margin-top:14px" onclick="doUnlock()">🔓 解锁查看</button>
+    <div class="ulerr" id="ulErr"></div>
+    <div class="ulfoot">数据仅在你的浏览器内解密，不会上传服务器</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 3D libraries (GitHub: mrdoob/three.js + tengbao/vanta) — bundled locally for offline use -->
+<script src="lib/three.r134.min.js"></script>
+<script src="lib/vanta.globe.min.js"></script>
+<script src="lib/vanta.net.min.js"></script>
+
+<script>
+/* ================= Data layer ================= */
+const KEY='hews_attendance_v1';
+const ROLES_VERSION=4;     // bump when default roles/KPIs change → triggers auto-migration
+const PERIODS=['2026','2027','2028','2029','全周期'];
+let db = load();
+let READONLY=false;        // true when viewing published encrypted data online
+let _encBlob=null;         // fetched encrypted payload (viewer mode)
+function roGuard(){if(READONLY){toast('只读模式，无法修改','err');return true;}return false;}
+
+// helper to build a kpi object
+function K(name,desc,weight,auto){return {id:uid(),name,desc,weight,auto:!!auto};}
+// shared auto attendance indicator (one per role)
+function attKpi(weight){return K('在岗时长','实际驻场到岗天数（系统自动计算）',weight,true);}
+
+// default department list (also defines personnel sort priority for departments)
+function defaultDepartments(){return ['沈阳设计院','煤科院','沈阳设计院-劳务','煤科院-劳务'];}
+
+// default industry-standard KPI sets per role category
+function defaultRoles(){
+  return [
+    {id:uid(),name:'项目经理',kpis:[
+      attKpi(12),
+      K('安全生产管理','安全生产责任制落实、零事故、重大隐患管控',20,false),
+      K('项目进度与目标达成','治理节点按期完成、总体计划达成率',18,false),
+      K('成本与预算控制','成本管控、预算执行、合同与结算管理',15,false),
+      K('工程质量管理','质量目标达成、验收合格率、整改闭环',13,false),
+      K('团队建设与管理','人员组织、绩效管理、内部协作',10,false),
+      K('合规与对外协调','合规经营、业主/政府/属地关系协调',12,false)
+    ]},
+    {id:uid(),name:'技术经理',kpis:[
+      attKpi(12),
+      K('技术方案与设计质量','采空区治理方案、注浆/充填设计质量',22,false),
+      K('技术标准与质量把控','工序质量、检验批与验收合格率',18,false),
+      K('技术创新与难题攻关','工艺优化、重难点技术攻关',15,false),
+      K('监测与数据管理','地表沉降、注浆监测数据准确及时',13,false),
+      K('技术资料与图纸审核','图纸会审、技术文件审核归档',10,false),
+      K('技术团队指导与交底','技术交底、人员指导培养',10,false)
+    ]},
+    {id:uid(),name:'设计经理',kpis:[
+      attKpi(12),
+      K('设计方案质量与深度','治理设计、注浆/充填方案的合理性与深度',22,false),
+      K('设计进度与交付及时性','设计计划达成、图纸交付及时率',18,false),
+      K('设计变更与现场配合','设计交底、变更管理、现场配合',16,false),
+      K('设计合规与规范执行','执行标准规范、设计评审通过率',12,false),
+      K('设计优化与成本控制','优化设计、可施工性、降本增效',12,false),
+      K('设计资料与图纸管理','设计文件、图纸归档与版本管理',8,false)
+    ]},
+    {id:uid(),name:'安全经理',kpis:[
+      attKpi(12),
+      K('安全责任制与制度建设','安全管理体系、制度落地',18,false),
+      K('重大风险管控与隐患治理','危险源辨识、隐患排查整改闭环',22,false),
+      K('安全检查与考核','检查到位率、违章查处与考核',16,false),
+      K('安全教育培训体系','三级教育、培训计划与覆盖率',12,false),
+      K('应急管理与演练','应急预案、演练组织、应急响应',12,false),
+      K('安全资料与上报合规','安全台账、资料规范、上报及时',8,false)
+    ]},
+    {id:uid(),name:'生产经理',kpis:[
+      attKpi(12),
+      K('生产任务完成率','产量/工程量目标达成率',22,false),
+      K('进度计划管控','计划编制、节点达成、工序衔接',18,false),
+      K('现场组织与资源调度','人机料组织、作业面调度',15,false),
+      K('施工成本与材料管控','材料消耗、节约降耗',13,false),
+      K('现场安全与文明施工','现场安全管控、文明施工',12,false),
+      K('协调配合与班组管理','内外协调、班组管理',8,false)
+    ]},
+    {id:uid(),name:'机电经理',kpis:[
+      attKpi(12),
+      K('设备完好率与运行保障','设备完好率、开机率、运行稳定',22,false),
+      K('设备维护保养与检修','保养计划、检修质量与及时性',18,false),
+      K('电气安全与用电管理','电气安全、临电规范、用电管理',16,false),
+      K('设备故障应急处理','故障响应速度、停机时间控制',12,false),
+      K('机电物资与备件管理','备件库存、物资台账管理',12,false),
+      K('节能降耗与技术改造','能耗控制、机电技改',8,false)
+    ]},
+    {id:uid(),name:'副经理',kpis:[
+      attKpi(12),
+      K('分管业务管理','分管领域（生产/技术/安全/机电等）目标达成',20,false),
+      K('安全生产管理','分管范围安全责任落实、隐患管控',18,false),
+      K('进度与质量协同管控','协助推进进度节点、质量目标',16,false),
+      K('成本与现场管理','分管成本控制、现场管理',12,false),
+      K('协调配合与团队管理','内外协调、团队组织管理',12,false),
+      K('制度执行与合规','制度落地、合规与廉洁',10,false)
+    ]},
+    {id:uid(),name:'安全员',kpis:[
+      attKpi(15),
+      K('隐患排查与整改','隐患排查频次、整改率、闭环管理',25,false),
+      K('现场安全巡查与违章查处','巡查到位率、违章纠正',20,false),
+      K('安全教育与班前会','班前会、现场安全教育',15,false),
+      K('应急处置与演练参与','应急处置、演练参与',13,false),
+      K('安全台账与记录规范','安全记录、台账完整规范',12,false)
+    ]},
+    {id:uid(),name:'技术人员',kpis:[
+      attKpi(15),
+      K('技术交底与方案执行','交底到位、方案落地执行',20,false),
+      K('施工质量与检验批验收','工序质量、检验批合格率',20,false),
+      K('测量放线与监测数据','测量精度、监测数据及时准确',18,false),
+      K('技术资料与图纸管理','技术资料整理、图纸管理',15,false),
+      K('现场技术问题处理','现场技术问题响应与解决',12,false)
+    ]},
+    {id:uid(),name:'资料员',kpis:[
+      attKpi(15),
+      K('资料收集与归档及时性','资料同步收集、归档及时率',25,false),
+      K('资料完整性与规范性','内业资料完整、格式规范、签认齐全',22,false),
+      K('台账与报表编制','各类台账、统计报表编制质量',18,false),
+      K('文件收发与流转','收发文登记、流转跟踪、催办',12,false),
+      K('保密与档案管理','档案保密、借阅管理、移交规范',8,false)
+    ]}
+  ];
+}
+
+function blankDB(){
+  return {
+    members:[],
+    records:[],
+    roles:defaultRoles(),         // roles[].kpis[] = {id,name,desc,weight,auto}
+    rolesVersion:ROLES_VERSION,
+    departments:defaultDepartments(),
+    holidays:[],                  // [{id,start,end,name}] 全局节假日时间段（非常驻扣除）
+    scores:{},                    // scores[period][memberId][kpiId] = number
+    dist:{ amount:'', mode:'score' }
+  };
+}
+function load(){
+  try{const d=JSON.parse(localStorage.getItem(KEY));
+    if(d&&d.members){
+      // auto-migrate roles/KPIs + department order when the built-in defaults have been updated
+      if(!d.roles||d.rolesVersion!==ROLES_VERSION){
+        d.roles=defaultRoles();d.rolesVersion=ROLES_VERSION;
+        const def=defaultDepartments();
+        if(!d.departments||!d.departments.length)d.departments=def;
+        else d.departments=def.filter(x=>d.departments.includes(x)).concat(d.departments.filter(x=>!def.includes(x)));
+      }
+      if(!d.departments)d.departments=defaultDepartments();
+      if(!d.holidays)d.holidays=[];
+      if(!d.scores)d.scores={};
+      if(!d.dist)d.dist={amount:'',mode:'score'};
+      try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){}
+      return d;
+    }
+  }catch(e){}
+  return blankDB();
+}
+function save(){if(READONLY)return;localStorage.setItem(KEY,JSON.stringify(db));}
+function uid(){return Math.random().toString(36).slice(2,9);}
+
+/* ================= Encryption (Web Crypto, AES-GCM + PBKDF2) ================= */
+function b64(u8){let s='';for(let i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return btoa(s);}
+function ub64(str){const bin=atob(str);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return u8;}
+async function deriveKey(pass,salt,iter,usage){
+  const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,[usage]);
+}
+async function encryptData(obj,pass){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pass,salt,150000,'encrypt');
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj)));
+  return {v:1,alg:'AES-GCM',kdf:'PBKDF2-SHA256',iter:150000,salt:b64(salt),iv:b64(iv),ct:b64(new Uint8Array(ct))};
+}
+async function decryptData(blob,pass){
+  const key=await deriveKey(pass,ub64(blob.salt),blob.iter||150000,'decrypt');
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(blob.iv)},key,ub64(blob.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+/* ---- role helpers ---- */
+function roleByName(name){return db.roles.find(r=>r.name===name);}
+function roleById(id){return db.roles.find(r=>r.id===id);}
+function kpisForMember(m){const r=m&&roleByName(m.role);return r?r.kpis:[attKpi(100)];}
+function membersOfRole(roleName){return db.members.filter(m=>m.role===roleName).sort(cmpMember);}
+
+/* ---- personnel ordering: by role order, then department order, then name ---- */
+function roleOrder(name){const i=db.roles.findIndex(r=>r.name===name);return i<0?999:i;}
+function deptOrder(name){const i=(db.departments||[]).indexOf(name);return i<0?999:i;}
+function cmpMember(a,b){
+  return roleOrder(a.role)-roleOrder(b.role)
+      || deptOrder(a.dept)-deptOrder(b.dept)
+      || (a.name>b.name?1:(a.name<b.name?-1:0));
+}
+function sortedMembers(){return [...db.members].sort(cmpMember);}
+
+/* ================= Date helpers ================= */
+function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
+function parseD(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+// inclusive day count between two yyyy-mm-dd
+function daysBetween(start,end){
+  const a=parseD(start),b=parseD(end);
+  return Math.floor((b-a)/86400000)+1;
+}
+// ---- weekend / holiday helpers ----
+function isWeekend(d){const g=d.getDay();return g===0||g===6;}
+function fmtD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function inHolidays(dStr){return (db.holidays||[]).some(h=>dStr>=h.start && dStr<=h.end);}
+function eachDay(s,e,cb){let d=parseD(s);const end=parseD(e);while(d<=end){cb(d);d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);}}
+
+// core: on-site days of a record within an arbitrary [winStart,winEnd] window (inclusive)
+// 常驻(resident): all calendar days. 非常驻: weekdays − 节假日(工作日) + 加班(休息日上班)
+function recordDaysInRange(rec,winStart,winEnd){
+  const realEnd = rec.end ? rec.end : todayStr();
+  const s = rec.start>winStart ? rec.start : winStart;
+  const e = realEnd<winEnd ? realEnd : winEnd;
+  if(s>e) return 0;
+  if(rec.resident===false){
+    let wd=0;
+    eachDay(s,e,d=>{ if(!isWeekend(d) && !inHolidays(fmtD(d))) wd++; });
+    const ot=(rec.overtime||[]).filter(x=>x>=s && x<=e && (isWeekend(parseD(x))||inHolidays(x))).length;
+    return wd+ot;
+  }
+  return daysBetween(s,e);
+}
+// days for a record given "as of today"
+function recordDays(rec){
+  const end = rec.end ? rec.end : todayStr();
+  return recordDaysInRange(rec,rec.start,end);
+}
+// overlap days of a record within a calendar year
+function recordDaysInYear(rec,year){
+  return recordDaysInRange(rec,`${year}-01-01`,`${year}-12-31`);
+}
+// overlap days of a record within a calendar month (1-12)
+function recordDaysInMonth(rec,year,month){
+  const mm=String(month).padStart(2,'0');
+  const last=new Date(year,month,0).getDate();
+  return recordDaysInRange(rec,`${year}-${mm}-01`,`${year}-${mm}-${String(last).padStart(2,'0')}`);
+}
+function daysInMonth(memberId,year,month){
+  return db.records.filter(r=>r.member===memberId).reduce((s,r)=>s+recordDaysInMonth(r,year,month),0);
+}
+function fmtMoney(n){return '¥ '+(Math.round(n*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+/* ================= Member functions ================= */
+function memberById(id){return db.members.find(m=>m.id===id);}
+function totalDays(memberId){
+  return db.records.filter(r=>r.member===memberId).reduce((s,r)=>s+recordDays(r),0);
+}
+function currentStint(memberId){
+  const open=db.records.filter(r=>r.member===memberId && !r.end).sort((a,b)=>b.start.localeCompare(a.start))[0];
+  return open?recordDays(open):0;
+}
+function isOnDuty(memberId){return db.records.some(r=>r.member===memberId && !r.end);}
+function daysInPeriod(memberId,period){
+  const recs=db.records.filter(r=>r.member===memberId);
+  if(period==='全周期') return recs.reduce((s,r)=>s+recordDays(r),0);
+  if(/^\d{4}-\d{2}$/.test(period)){const [y,m]=period.split('-').map(Number);return recs.reduce((s,r)=>s+recordDaysInMonth(r,y,m),0);}
+  return recs.reduce((s,r)=>s+recordDaysInYear(r,Number(period)),0);
+}
+
+function addMember(){
+  if(roGuard())return;
+  const name=val('m_name').trim();
+  if(!name){toast('请填写姓名','err');return;}
+  db.members.push({id:uid(),name,role:val('m_role').trim(),dept:val('m_dept').trim(),phone:val('m_phone').trim()});
+  ['m_name','m_role','m_dept','m_phone'].forEach(i=>document.getElementById(i).value='');
+  save();renderAll();toast('已添加成员：'+name,'ok');
+}
+function delMember(id){
+  if(roGuard())return;
+  const m=memberById(id);
+  const cnt=db.records.filter(r=>r.member===id).length;
+  if(!confirm(`确定删除成员「${m.name}」？\n将同时删除其 ${cnt} 条到岗记录及绩效评分，且不可恢复。`))return;
+  db.members=db.members.filter(x=>x.id!==id);
+  db.records=db.records.filter(r=>r.member!==id);
+  Object.keys(db.scores).forEach(p=>{if(db.scores[p])delete db.scores[p][id];});
+  save();renderAll();toast('已删除','ok');
+}
+function openEdit(id){
+  if(roGuard())return;
+  const m=memberById(id);
+  setVal('e_id',id);setVal('e_name',m.name);selVal('e_role',m.role||'');selVal('e_dept',m.dept||'');setVal('e_phone',m.phone||'');
+  document.getElementById('editModal').classList.add('show');
+}
+function saveMemberEdit(){
+  if(roGuard())return;
+  const m=memberById(val('e_id'));
+  m.name=val('e_name').trim()||m.name;m.role=val('e_role').trim();m.dept=val('e_dept').trim();m.phone=val('e_phone').trim();
+  save();closeModal('editModal');renderAll();toast('已保存','ok');
+}
+
+/* ================= Record functions ================= */
+function toggleOvertime(){
+  document.getElementById('otWrap').style.display=(val('r_resident')==='0')?'flex':'none';
+}
+function parseDates(str){
+  return (str||'').split(/[,，\s]+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+}
+function addRecord(){
+  if(roGuard())return;
+  const member=val('r_member'),start=val('r_start'),end=val('r_end');
+  if(!member){toast('请选择成员','err');return;}
+  if(!start){toast('请填写到岗日期','err');return;}
+  if(end && end<start){toast('离岗日期不能早于到岗日期','err');return;}
+  const resident=val('r_resident')!=='0';
+  const overtime=resident?[]:parseDates(val('r_overtime'));
+  db.records.push({id:uid(),member,start,end:end||'',note:val('r_note').trim(),resident,overtime});
+  ['r_start','r_end','r_note','r_overtime'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('r_resident').value='1';toggleOvertime();
+  save();renderAll();toast('记录已登记','ok');
+}
+function delRecord(id){
+  if(roGuard())return;
+  if(!confirm('确定删除这条记录？'))return;
+  db.records=db.records.filter(r=>r.id!==id);
+  save();renderAll();toast('已删除','ok');
+}
+function closeRecord(id){
+  if(roGuard())return;
+  const r=db.records.find(x=>x.id===id);
+  const d=prompt('填写离岗日期 (YYYY-MM-DD)：',todayStr());
+  if(!d)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('日期格式不正确','err');return;}
+  if(d<r.start){toast('离岗日期不能早于到岗日期','err');return;}
+  r.end=d;save();renderAll();toast('已登记离岗','ok');
+}
+
+/* ================= Holiday functions ================= */
+function addHoliday(){
+  if(roGuard())return;
+  const s=val('h_start'),e=val('h_end'),name=val('h_name').trim();
+  if(!s||!e){toast('请填写节假日起止日期','err');return;}
+  if(e<s){toast('结束日期不能早于开始日期','err');return;}
+  if(!db.holidays)db.holidays=[];
+  db.holidays.push({id:uid(),start:s,end:e,name:name||'节假日'});
+  ['h_start','h_end','h_name'].forEach(i=>document.getElementById(i).value='');
+  save();renderAll();toast('已添加节假日','ok');
+}
+function delHoliday(id){
+  if(roGuard())return;
+  if(!confirm('删除该节假日时间段？'))return;
+  db.holidays=db.holidays.filter(h=>h.id!==id);
+  save();renderAll();toast('已删除','ok');
+}
+function renderHolidays(){
+  const el=document.getElementById('holidayList');if(!el)return;
+  const hs=[...(db.holidays||[])].sort((a,b)=>a.start.localeCompare(b.start));
+  if(!hs.length){el.innerHTML='<div class="empty" style="padding:18px">暂无节假日，添加后对非常驻成员生效</div>';return;}
+  el.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>名称</th><th>开始</th><th>结束</th><th class="num">天数</th><th style="text-align:center;width:60px">操作</th></tr></thead><tbody>'+
+    hs.map(h=>`<tr><td><b>${esc(h.name)}</b></td><td>${h.start}</td><td>${h.end}</td><td class="num">${daysBetween(h.start,h.end)} 天</td>
+      <td style="text-align:center"><button class="icon-btn del" onclick="delHoliday('${h.id}')">🗑</button></td></tr>`).join('')+
+    '</tbody></table></div>';
+}
+
+/* ================= Department functions ================= */
+function addDept(){
+  if(roGuard())return;
+  const name=val('dept_new').trim();
+  if(!name){toast('请填写部门名称','err');return;}
+  if(!db.departments)db.departments=defaultDepartments();
+  if(db.departments.includes(name)){toast('该部门已存在','err');return;}
+  db.departments.push(name);setVal('dept_new','');
+  save();renderSettings();fillRoleSelects();toast('已添加部门：'+name,'ok');
+}
+function delDept(name){
+  if(roGuard())return;
+  const cnt=db.members.filter(m=>m.dept===name).length;
+  if(!confirm(`删除部门「${name}」？\n当前有 ${cnt} 名成员属于该部门，删除后其部门将变为未分类。`))return;
+  db.departments=db.departments.filter(d=>d!==name);
+  save();renderSettings();fillRoleSelects();toast('已删除部门','ok');
+}
+function resetRoles(){
+  if(roGuard())return;
+  if(!confirm('将「岗位与考核指标」恢复为系统默认（8 个岗位的默认指标）？\n注意：你对指标名称/权重的自定义修改将被覆盖；成员、到岗记录与已填评分不受影响。'))return;
+  db.roles=defaultRoles();
+  curRole=db.roles[0]?db.roles[0].id:null;
+  save();renderAll();fillRoleSelects();toast('已恢复默认岗位与指标','ok');
+}
+
+/* ================= Role & KPI functions ================= */
+let curRole=null; // selected role id in settings
+
+function addRole(){
+  if(roGuard())return;
+  const name=val('role_new').trim();
+  if(!name){toast('请填写岗位名称','err');return;}
+  if(roleByName(name)){toast('该岗位已存在','err');return;}
+  const r={id:uid(),name,kpis:[attKpi(100)]};
+  db.roles.push(r);curRole=r.id;setVal('role_new','');
+  save();renderSettings();fillRoleSelects();toast('已添加岗位：'+name,'ok');
+}
+function delRole(id){
+  if(roGuard())return;
+  const r=roleById(id);
+  const cnt=membersOfRole(r.name).length;
+  if(!confirm(`删除岗位「${r.name}」及其全部考核指标？\n当前有 ${cnt} 名成员属于该岗位，删除后其岗位将变为未分类。`))return;
+  db.roles=db.roles.filter(x=>x.id!==id);
+  if(curRole===id)curRole=db.roles[0]?db.roles[0].id:null;
+  save();renderAll();fillRoleSelects();toast('已删除岗位','ok');
+}
+function renameRole(id,v){
+  if(roGuard())return;
+  const r=roleById(id);const nn=v.trim();if(!nn||nn===r.name)return;
+  if(roleByName(nn)){toast('已存在同名岗位','err');renderSettings();return;}
+  const old=r.name;r.name=nn;
+  db.members.forEach(m=>{if(m.role===old)m.role=nn;}); // keep members in sync
+  save();renderAll();fillRoleSelects();toast('岗位已重命名','ok');
+}
+function addKpi(){
+  if(roGuard())return;
+  if(!curRole){toast('请先选择岗位','err');return;}
+  const name=val('k_name').trim();
+  if(!name){toast('请填写指标名称','err');return;}
+  roleById(curRole).kpis.push(K(name,val('k_desc').trim(),Number(val('k_w'))||0,false));
+  ['k_name','k_desc','k_w'].forEach(i=>document.getElementById(i).value='');
+  save();renderSettings();renderPerf();renderDist();toast('已添加指标','ok');
+}
+function delKpi(roleId,id){
+  if(roGuard())return;
+  const r=roleById(roleId);const k=r.kpis.find(x=>x.id===id);
+  if(k.auto){toast('「在岗时长」为系统自动指标，不可删除','err');return;}
+  if(!confirm('删除指标「'+k.name+'」？相关评分将清除。'))return;
+  r.kpis=r.kpis.filter(x=>x.id!==id);
+  Object.keys(db.scores).forEach(p=>Object.keys(db.scores[p]||{}).forEach(mid=>{if(db.scores[p][mid])delete db.scores[p][mid][id];}));
+  save();renderSettings();renderPerf();renderDist();toast('已删除指标','ok');
+}
+function updKpi(roleId,id,field,v){
+  if(roGuard())return;
+  const k=roleById(roleId).kpis.find(x=>x.id===id);
+  if(field==='weight')k.weight=Number(v)||0;
+  else if(field==='name'){if(!v.trim())return;k.name=v.trim();}
+  else if(field==='desc')k.desc=v.trim();
+  save();if(field==='weight'){renderSettings();renderPerf();renderDist();}else{renderPerf();}
+}
+
+/* ================= Scoring ================= */
+// period model: curYear in {2026..2029,'全周期'}; curMonth in {'',01..12}; effective key curPeriod
+let curYear='全周期', curMonth='', curPeriod='全周期';
+function refreshPeriod(){curPeriod=(curYear==='全周期')?'全周期':(curMonth?`${curYear}-${curMonth}`:String(curYear));}
+function periodLabel(p){
+  if(p==='全周期')return '全周期(2026-2029)';
+  if(/^\d{4}-\d{2}$/.test(p)){const [y,m]=p.split('-');return `${y}年${Number(m)}月`;}
+  return p+'年度';
+}
+function getScore(period,mid,kid){return (db.scores[period]&&db.scores[period][mid]&&db.scores[period][mid][kid]!=null)?db.scores[period][mid][kid]:'';}
+function setScore(period,mid,kid,v){
+  if(roGuard())return;
+  if(!db.scores[period])db.scores[period]={};
+  if(!db.scores[period][mid])db.scores[period][mid]={};
+  db.scores[period][mid][kid]=v===''?null:Math.max(0,Math.min(100,Number(v)));
+  save();renderPerf();renderDist();
+}
+function autoAttendanceScore(period,mid){
+  const maxDays=Math.max(1,...db.members.map(m=>daysInPeriod(m.id,period)));
+  return Math.round(daysInPeriod(mid,period)/maxDays*100*10)/10;
+}
+// composite score 0-100 for a member in period (uses the member's role KPI set)
+function composite(period,mid){
+  const m=memberById(mid);
+  const kpis=kpisForMember(m);
+  const wtot=kpis.reduce((s,k)=>s+(Number(k.weight)||0),0)||1;
+  let sum=0;
+  kpis.forEach(k=>{
+    let sc;
+    if(k.auto){sc=autoAttendanceScore(period,mid);}
+    else{const v=getScore(period,mid,k.id);sc=(v===''||v==null)?0:Number(v);}
+    sum+=sc*(k.weight/wtot); // normalize by actual weight sum so it stays 0-100
+  });
+  return Math.round(sum*100)/100;
+}
+
+/* ================= Rendering ================= */
+function val(id){return document.getElementById(id).value;}
+function setVal(id,v){document.getElementById(id).value=v;}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function renderAll(){
+  fillMemberSelects();renderDash();renderMembers();renderRecords();renderHolidays();renderStats();renderPerf();renderDist();renderSettings();
+}
+
+function fillMemberSelects(){
+  const opts=sortedMembers().map(m=>`<option value="${m.id}">${esc(m.name)}${m.role?' · '+esc(m.role):''}</option>`).join('');
+  document.getElementById('r_member').innerHTML=opts||'<option value="">请先在「人员管理」添加成员</option>';
+  const f=document.getElementById('r_filter');
+  const cur=f.value;
+  f.innerHTML='<option value="">全部成员</option>'+opts;
+  if(cur)f.value=cur;
+  // export member select
+  const em=document.getElementById('exp_member');
+  if(em){const c2=em.value;em.innerHTML=opts||'<option value="">暂无成员</option>';if(c2)em.value=c2;}
+  // month year select
+  const my=document.getElementById('monthYear');
+  if(my && !my.dataset.init){my.innerHTML=['2026','2027','2028','2029'].map(y=>`<option value="${y}">${y} 年</option>`).join('');my.dataset.init='1';}
+  fillRoleSelects();
+}
+function fillRoleSelects(){
+  const roleOpts=db.roles.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('')+'<option value="">未分类</option>';
+  ['m_role','e_role'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;el.innerHTML=roleOpts;el.value=cur||(db.roles[0]?db.roles[0].name:'');
+  });
+  const deptList=db.departments||defaultDepartments();
+  const deptOpts=deptList.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('')+'<option value="">未分类</option>';
+  ['m_dept','e_dept'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;el.innerHTML=deptOpts;el.value=cur||(deptList[0]||'');
+  });
+}
+// set a select value, adding the option first if it doesn't exist (preserves legacy values)
+function selVal(id,value){
+  const el=document.getElementById(id);if(!el)return;
+  if(value && ![...el.options].some(o=>o.value===value))el.add(new Option(value,value));
+  el.value=value;
+}
+
+/* ----- Dashboard ----- */
+function renderDash(){
+  document.getElementById('today').textContent=todayStr();
+  const onDuty=sortedMembers().filter(m=>isOnDuty(m.id));
+  const totalManDays=db.records.reduce((s,r)=>s+recordDays(r),0);
+  const avg=db.members.length?Math.round(totalManDays/db.members.length):0;
+  const cards=[
+    {label:'项目部成员',val:db.members.length,unit:'人',ic:'👥',cls:'bi-blue',foot:'在册总人数'},
+    {label:'当前在岗',val:onDuty.length,unit:'人',ic:'📍',cls:'bi-green',foot:onDuty.length?onDuty.slice(0,3).map(m=>m.name).join('、')+(onDuty.length>3?' 等':''):'暂无在岗'},
+    {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold',foot:'全部记录合计'},
+    {label:'人均在岗',val:avg,unit:'天',ic:'📈',cls:'bi-teal',foot:'累计 ÷ 成员数'}
+  ];
+  document.getElementById('dashStats').innerHTML=cards.map(c=>`
+    <div class="card stat">
+      <div class="badge-ic ${c.cls}">${c.ic}</div>
+      <div class="label">${c.label}</div>
+      <div class="val">${c.val}<span class="unit">${c.unit}</span></div>
+      <div class="foot">${esc(c.foot)}</div>
+    </div>`).join('');
+
+  // on duty list
+  const od=document.getElementById('onDutyList');
+  if(!onDuty.length){od.innerHTML='<div class="empty"><div class="big">🌙</div>当前无人在岗</div>';}
+  else{
+    od.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>到岗日期</th><th class="num">本次在岗</th></tr></thead><tbody>'+
+      onDuty.map(m=>{
+        const open=db.records.filter(r=>r.member===m.id&&!r.end).sort((a,b)=>b.start.localeCompare(a.start))[0];
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${open.start}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td></tr>`;
+      }).join('')+'</tbody></table></div>';
+  }
+
+  // top days
+  const ranked=[...db.members].map(m=>({m,d:totalDays(m.id)})).sort((a,b)=>b.d-a.d).slice(0,8);
+  const top=document.getElementById('topDays');
+  if(!ranked.length||ranked[0].d===0){top.innerHTML='<div class="empty"><div class="big">📊</div>暂无在岗数据</div>';}
+  else{
+    const max=ranked[0].d||1;
+    top.innerHTML=ranked.map(r=>`
+      <div class="barrow"><div class="nm">${esc(r.m.name)}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(8,r.d/max*100)}%">${r.d}</div></div>
+      <div class="vv">${r.d} 天</div></div>`).join('');
+  }
+
+  // year chart
+  renderYearChart('yearChart');
+}
+function renderYearChart(elId){
+  const years=['2026','2027','2028','2029'];
+  const data=years.map(y=>({y,d:db.members.reduce((s,m)=>s+daysInPeriod(m.id,y),0)}));
+  const max=Math.max(1,...data.map(d=>d.d));
+  document.getElementById(elId).innerHTML=data.map(d=>`
+    <div class="barrow"><div class="nm">${d.y} 年</div>
+    <div class="track"><div class="fill" style="width:${Math.max(6,d.d/max*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold-soft))">${d.d?d.d:''}</div></div>
+    <div class="vv">${d.d} 人天</div></div>`).join('');
+}
+
+/* ----- Members ----- */
+function renderMembers(){
+  document.getElementById('memberCount').textContent=`共 ${db.members.length} 人`;
+  const b=document.getElementById('memberBody');
+  if(!db.members.length){b.innerHTML='<tr><td colspan="8"><div class="empty"><div class="big">👤</div>暂无成员，请在上方添加</div></td></tr>';return;}
+  b.innerHTML=sortedMembers().map(m=>`
+    <tr>
+      <td><b>${esc(m.name)}</b></td>
+      <td>${esc(m.role||'-')}</td>
+      <td>${esc(m.dept||'-')}</td>
+      <td>${esc(m.phone||'-')}</td>
+      <td>${isOnDuty(m.id)?'<span class="tag tag-on">在岗</span>':'<span class="tag tag-off">离岗</span>'}</td>
+      <td class="num">${isOnDuty(m.id)?`<span class="tag tag-on">${currentStint(m.id)} 天</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td>
+      <td class="num">${totalDays(m.id)} 天</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button class="icon-btn" title="编辑" onclick="openEdit('${m.id}')">✏️</button>
+        <button class="icon-btn del" title="删除" onclick="delMember('${m.id}')">🗑</button>
+      </td>
+    </tr>`).join('');
+  renderDeptStats();
+}
+function renderDeptStats(){
+  const tb=document.getElementById('deptStatBody');if(!tb)return;
+  const deps=[...(db.departments||[])];
+  // include any member dept not in the list
+  db.members.forEach(m=>{if(m.dept && !deps.includes(m.dept))deps.push(m.dept);});
+  const rows=deps.map(d=>{
+    const list=db.members.filter(m=>(m.dept||'')===d);
+    const on=list.filter(m=>isOnDuty(m.id)).length;
+    return {d,on,off:list.length-on,total:list.length};
+  }).filter(r=>r.total>0);
+  // unclassified
+  const noDept=db.members.filter(m=>!m.dept);
+  if(noDept.length){const on=noDept.filter(m=>isOnDuty(m.id)).length;rows.push({d:'未分配部门',on,off:noDept.length-on,total:noDept.length});}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">暂无成员</div></td></tr>';return;}
+  const fmt=r=>`<tr><td><b>${esc(r.d)}</b></td>
+    <td class="num"><span class="tag tag-on">${r.on}</span></td>
+    <td class="num"><span class="tag tag-off">${r.off}</span></td>
+    <td class="num"><b>${r.total}</b></td>
+    <td class="num">${r.total?Math.round(r.on/r.total*100):0}%</td></tr>`;
+  const tot={on:rows.reduce((s,r)=>s+r.on,0),off:rows.reduce((s,r)=>s+r.off,0),total:rows.reduce((s,r)=>s+r.total,0)};
+  tb.innerHTML=rows.map(fmt).join('')+
+    `<tr style="background:rgba(232,176,75,.06)"><td><b>合计</b></td><td class="num"><b>${tot.on}</b></td><td class="num"><b>${tot.off}</b></td><td class="num"><b>${tot.total}</b></td><td class="num"><b>${tot.total?Math.round(tot.on/tot.total*100):0}%</b></td></tr>`;
+}
+
+/* ----- Records ----- */
+function renderRecords(){
+  const filter=document.getElementById('r_filter').value;
+  const kw=(document.getElementById('r_search')?document.getElementById('r_search').value:'').trim().toLowerCase();
+  let recs=[...db.records].sort((a,b)=>b.start.localeCompare(a.start));
+  if(filter)recs=recs.filter(r=>r.member===filter);
+  if(kw)recs=recs.filter(r=>{const m=memberById(r.member);return m&&m.name.toLowerCase().includes(kw);});
+  const b=document.getElementById('recordBody');
+  if(!recs.length){b.innerHTML='<tr><td colspan="9"><div class="empty"><div class="big">📅</div>无匹配记录</div></td></tr>';return;}
+  b.innerHTML=recs.map(r=>{
+    const m=memberById(r.member)||{name:'(已删除)',role:''};
+    const open=!r.end;
+    const nonRes=r.resident===false;
+    const otCnt=(r.overtime||[]).length;
+    const typeTag=nonRes
+      ? `<span class="tag tag-off" title="非常驻：扣周末/节假日${otCnt?('，加班'+otCnt+'天'):''}">非常驻${otCnt?` +${otCnt}`:''}</span>`
+      : '<span class="tag tag-on">常驻</span>';
+    return `<tr>
+      <td><b>${esc(m.name)}</b></td>
+      <td>${esc(m.role||'-')}</td>
+      <td>${typeTag}</td>
+      <td>${r.start}</td>
+      <td>${r.end||'<span style="color:var(--txt-mut)">— 在岗中 —</span>'}</td>
+      <td class="num">${recordDays(r)} 天</td>
+      <td>${open?'<span class="tag tag-on">在岗</span>':'<span class="tag tag-off">已离岗</span>'}</td>
+      <td>${esc(r.note||'-')}</td>
+      <td style="text-align:center;white-space:nowrap">
+        ${open?`<button class="icon-btn" title="登记离岗" onclick="closeRecord('${r.id}')">🚪</button>`:''}
+        <button class="icon-btn del" title="删除" onclick="delRecord('${r.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ----- Stats ----- */
+function renderStats(){
+  const totalManDays=db.records.reduce((s,r)=>s+recordDays(r),0);
+  const onDuty=db.members.filter(m=>isOnDuty(m.id)).length;
+  const maxM=[...db.members].map(m=>({m,d:totalDays(m.id)})).sort((a,b)=>b.d-a.d)[0];
+  const cards=[
+    {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold'},
+    {label:'登记记录数',val:db.records.length,unit:'条',ic:'📋',cls:'bi-blue'},
+    {label:'当前在岗',val:onDuty,unit:'人',ic:'📍',cls:'bi-green'},
+    {label:'在岗时长之最',val:maxM&&maxM.d?maxM.d:0,unit:'天',ic:'🏆',cls:'bi-purple',foot:maxM&&maxM.d?maxM.m.name:'-'}
+  ];
+  document.getElementById('statsCards').innerHTML=cards.map(c=>`
+    <div class="card stat"><div class="badge-ic ${c.cls}">${c.ic}</div>
+    <div class="label">${c.label}</div><div class="val">${c.val}<span class="unit">${c.unit}</span></div>
+    ${c.foot?`<div class="foot">${esc(c.foot)}</div>`:''}</div>`).join('');
+
+  // bars
+  const ranked=[...db.members].map(m=>({m,d:totalDays(m.id)})).sort((a,b)=>b.d-a.d);
+  const sb=document.getElementById('statBars');
+  if(!ranked.length){sb.innerHTML='<div class="empty">暂无数据</div>';}
+  else{
+    const max=Math.max(1,...ranked.map(r=>r.d));
+    sb.innerHTML=ranked.map(r=>`<div class="barrow"><div class="nm">${esc(r.m.name)}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(6,r.d/max*100)}%">${r.d}</div></div>
+      <div class="vv">${r.d} 天</div></div>`).join('');
+  }
+
+  // matrix
+  const years=['2026','2027','2028','2029'];
+  document.getElementById('matrixHead').innerHTML='<tr><th>姓名</th><th>岗位</th>'+years.map(y=>`<th class="num">${y}</th>`).join('')+'<th class="num">合计</th></tr>';
+  const mb=document.getElementById('matrixBody');
+  if(!db.members.length){mb.innerHTML='<tr><td colspan="7"><div class="empty">暂无成员</div></td></tr>';}
+  else{
+    mb.innerHTML=sortedMembers().map(m=>{
+      const cells=years.map(y=>daysInPeriod(m.id,y));
+      const tot=cells.reduce((a,b)=>a+b,0);
+      return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td>${cells.map(c=>`<td class="num">${c||'-'}</td>`).join('')}<td class="num"><b>${tot}</b></td></tr>`;
+    }).join('');
+    const colTot=years.map(y=>db.members.reduce((s,m)=>s+daysInPeriod(m.id,y),0));
+    mb.innerHTML+=`<tr style="background:rgba(232,176,75,.06)"><td colspan="2"><b>合计</b></td>${colTot.map(c=>`<td class="num"><b>${c}</b></td>`).join('')}<td class="num"><b>${colTot.reduce((a,b)=>a+b,0)}</b></td></tr>`;
+  }
+  renderMonthly();
+}
+
+/* ----- Monthly stats ----- */
+function renderMonthly(){
+  const my=document.getElementById('monthYear');
+  const year=Number(my && my.value ? my.value : 2026);
+  const months=[1,2,3,4,5,6,7,8,9,10,11,12];
+  document.getElementById('monthHead').innerHTML='<tr><th>姓名</th>'+months.map(m=>`<th class="num">${m}月</th>`).join('')+'<th class="num">年合计</th></tr>';
+  const body=document.getElementById('monthBody');
+  if(!db.members.length){body.innerHTML='<tr><td colspan="14"><div class="empty">暂无成员</div></td></tr>';}
+  else{
+    body.innerHTML=sortedMembers().map(m=>{
+      const cells=months.map(mo=>daysInMonth(m.id,year,mo));
+      const tot=cells.reduce((a,b)=>a+b,0);
+      return `<tr><td><b>${esc(m.name)}</b></td>${cells.map(c=>`<td class="num">${c||'<span style="color:var(--txt-mut)">-</span>'}</td>`).join('')}<td class="num"><b>${tot}</b></td></tr>`;
+    }).join('');
+    const colTot=months.map(mo=>db.members.reduce((s,m)=>s+daysInMonth(m.id,year,mo),0));
+    body.innerHTML+=`<tr style="background:rgba(232,176,75,.06)"><td><b>月合计</b></td>${colTot.map(c=>`<td class="num"><b>${c||0}</b></td>`).join('')}<td class="num"><b>${colTot.reduce((a,b)=>a+b,0)}</b></td></tr>`;
+  }
+  // month trend bars (all members combined)
+  const colTot=months.map(mo=>db.members.reduce((s,m)=>s+daysInMonth(m.id,year,mo),0));
+  const max=Math.max(1,...colTot);
+  document.getElementById('monthBars').innerHTML=months.map((mo,i)=>`
+    <div class="barrow"><div class="nm">${year}年${mo}月</div>
+    <div class="track"><div class="fill" style="width:${Math.max(4,colTot[i]/max*100)}%;background:linear-gradient(90deg,var(--purple),var(--blue))">${colTot[i]||''}</div></div>
+    <div class="vv">${colTot[i]} 人天</div></div>`).join('');
+}
+
+/* ----- Performance ----- */
+function buildPeriodSegs(){
+  refreshPeriod();
+  ['periodSeg','periodSeg2'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML=PERIODS.map(p=>`<button class="${String(p)===String(curYear)?'active':''}" onclick="setYear('${p}')">${p==='全周期'?'全周期':p+'年'}</button>`).join('');
+  });
+  const monthOpts='<option value="">全年</option>'+[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${String(m).padStart(2,'0')}">${m}月</option>`).join('');
+  ['monthSel','monthSel2'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML=monthOpts;el.value=curMonth;el.disabled=(curYear==='全周期');
+  });
+}
+function setYear(y){curYear=(y==='全周期')?'全周期':y;if(curYear==='全周期')curMonth='';buildPeriodSegs();renderPerf();renderDist();}
+function setMonth(m){curMonth=m||'';buildPeriodSegs();renderPerf();renderDist();}
+// kept for backward compatibility
+function setPeriod(p){if(p==='全周期'){curYear='全周期';curMonth='';}else{curYear=p;curMonth='';}buildPeriodSegs();renderPerf();renderDist();}
+
+function perfTableForGroup(title,kpis,members,subtitle){
+  const head='<tr><th style="width:90px">姓名</th>'+
+    kpis.map(k=>`<th class="num" title="${esc(k.desc)}">${esc(k.name)}<br><span style="font-weight:400;color:var(--txt-mut)">${k.weight}%${k.auto?' · 自动':''}</span></th>`).join('')+
+    '<th class="num" style="width:80px">综合得分</th></tr>';
+  const body=members.map(m=>{
+    const cells=kpis.map(k=>{
+      if(k.auto){
+        return `<td class="num"><span class="scorecell" style="color:var(--teal)">${autoAttendanceScore(curPeriod,m.id)}</span><br><span style="font-size:10px;color:var(--txt-mut)">${daysInPeriod(m.id,curPeriod)}天</span></td>`;
+      }
+      return `<td class="num"><input class="score-in" type="number" min="0" max="100" value="${getScore(curPeriod,m.id,k.id)}" placeholder="0" onchange="setScore('${curPeriod}','${m.id}','${k.id}',this.value)"></td>`;
+    }).join('');
+    const comp=composite(curPeriod,m.id);
+    const col=comp>=80?'var(--green)':comp>=60?'var(--gold)':'var(--red)';
+    return `<tr><td><b>${esc(m.name)}</b></td>${cells}<td class="num"><span class="scorecell" style="font-size:16px;color:${col}">${comp}</span></td></tr>`;
+  }).join('');
+  return `<div class="panel">
+    <div class="panel-head"><h3>⭐ ${esc(title)} <span class="pill">${members.length} 人</span></h3>
+    <span class="pill">${esc(subtitle||'')}</span></div>
+    <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+}
+function renderPerf(){
+  const c=document.getElementById('perfContainer');
+  const periodTxt='考核周期：'+periodLabel(curPeriod);
+  if(!db.members.length){c.innerHTML='<div class="panel"><div class="empty"><div class="big">⭐</div>请先在「人员管理」添加成员，并为其指定岗位</div></div>';return;}
+  let html='';
+  db.roles.forEach(r=>{
+    const ms=membersOfRole(r.name);
+    if(ms.length)html+=perfTableForGroup(r.name,r.kpis,ms,periodTxt);
+  });
+  const unclassified=db.members.filter(m=>!roleByName(m.role)).sort(cmpMember);
+  if(unclassified.length)html+=perfTableForGroup('未分类（无对应岗位指标）',[attKpi(100)],unclassified,periodTxt);
+  c.innerHTML=html;
+}
+
+/* ----- Distribution ----- */
+function renderDist(){
+  document.getElementById('distPeriodLabel').textContent='考核周期：'+periodLabel(curPeriod);
+  const amt=Number(document.getElementById('totalAmount').value)||0;
+  db.dist.amount=document.getElementById('totalAmount').value;
+  db.dist.mode=document.getElementById('distMode').value;save();
+  document.getElementById('distTotalShow').textContent=fmtMoney(amt);
+  const mode=db.dist.mode;
+  const rows=db.members.map(m=>{
+    const comp=composite(curPeriod,m.id);
+    const days=daysInPeriod(curPeriod,m.id)?daysInPeriod(m.id,curPeriod):daysInPeriod(m.id,curPeriod);
+    const d=daysInPeriod(m.id,curPeriod);
+    const weight=mode==='scoreday'?comp*d:comp;
+    return {m,comp,d,weight};
+  });
+  const wsum=rows.reduce((s,r)=>s+r.weight,0);
+  rows.forEach(r=>{r.ratio=wsum>0?r.weight/wsum:0;r.amount=amt*r.ratio;});
+  rows.sort((a,b)=>b.amount-a.amount||b.comp-a.comp);
+  const b=document.getElementById('distBody');
+  if(!db.members.length){b.innerHTML='<tr><td colspan="8"><div class="empty"><div class="big">💰</div>请先添加成员并完成评分</div></td></tr>';document.getElementById('distFoot').innerHTML='';return;}
+  b.innerHTML=rows.map((r,i)=>`
+    <tr>
+      <td>${i<3?['🥇','🥈','🥉'][i]:'<span class="pill">'+(i+1)+'</span>'}</td>
+      <td><b>${esc(r.m.name)}</b></td>
+      <td>${esc(r.m.role||'-')}</td>
+      <td class="num">${r.d} 天</td>
+      <td class="num scorecell">${r.comp}</td>
+      <td class="num">${Math.round(r.weight*100)/100}</td>
+      <td class="num">${(r.ratio*100).toFixed(2)}%</td>
+      <td class="num money">${fmtMoney(r.amount)}</td>
+    </tr>`).join('');
+  document.getElementById('distFoot').innerHTML=`<tr style="background:rgba(232,176,75,.06)">
+    <td colspan="6"><b>合计</b></td>
+    <td class="num"><b>100.00%</b></td>
+    <td class="num money"><b>${fmtMoney(rows.reduce((s,r)=>s+r.amount,0))}</b></td></tr>`;
+}
+
+/* ----- Settings ----- */
+function renderSettings(){
+  // role tabs
+  if(!curRole||!roleById(curRole))curRole=db.roles[0]?db.roles[0].id:null;
+  document.getElementById('roleTabs').innerHTML=db.roles.map(r=>{
+    const cnt=membersOfRole(r.name).length;
+    return `<button class="${r.id===curRole?'active':''}" onclick="curRole='${r.id}';renderSettings()">${esc(r.name)}<span style="opacity:.7;font-size:11px"> · ${cnt}人</span></button>`;
+  }).join('')||'<span style="color:var(--txt-mut);padding:8px">暂无岗位，请在上方添加</span>';
+
+  const role=roleById(curRole);
+  const cn=document.getElementById('curRoleName');
+  const delBtn=document.getElementById('delRoleBtn');
+  const kb=document.getElementById('kpiBody');
+  if(!role){cn.textContent='考核指标';document.getElementById('weightSum').textContent='';kb.innerHTML='<tr><td colspan="5"><div class="empty">请先选择或添加岗位</div></td></tr>';delBtn.style.display='none';return;}
+  delBtn.style.display='';
+  cn.innerHTML=`「<input value="${esc(role.name)}" onchange="renameRole('${role.id}',this.value)" style="width:auto;display:inline-block;padding:4px 8px;font-size:14px;font-weight:700">」考核指标`;
+
+  const sum=role.kpis.reduce((s,k)=>s+(Number(k.weight)||0),0);
+  const ws=document.getElementById('weightSum');
+  ws.textContent=`权重合计 ${sum}%`;
+  ws.style.color=sum===100?'var(--green)':'var(--red)';
+  kb.innerHTML=role.kpis.map(k=>`
+    <tr>
+      <td>${k.auto?`<b>${esc(k.name)}</b>`:`<input value="${esc(k.name)}" onchange="updKpi('${role.id}','${k.id}','name',this.value)" style="padding:6px 8px;font-weight:600">`}</td>
+      <td>${k.auto?`<span style="color:var(--txt-dim);font-size:12px">${esc(k.desc||'-')}</span>`:`<input value="${esc(k.desc||'')}" onchange="updKpi('${role.id}','${k.id}','desc',this.value)" style="padding:6px 8px;font-size:12px">`}</td>
+      <td class="num"><input class="weight-in" type="number" min="0" value="${k.weight}" onchange="updKpi('${role.id}','${k.id}','weight',this.value)"></td>
+      <td>${k.auto?'<span class="tag tag-on">自动</span>':'<span class="tag tag-off">人工</span>'}</td>
+      <td style="text-align:center">${k.auto?'<span style="color:var(--txt-mut)">—</span>':`<button class="icon-btn del" onclick="delKpi('${role.id}','${k.id}')">🗑</button>`}</td>
+    </tr>`).join('');
+
+  // department list
+  const dl2=document.getElementById('deptList');
+  if(dl2){
+    const deps=db.departments||[];
+    dl2.innerHTML=deps.length?('<div class="tbl-wrap"><table><thead><tr><th>部门名称</th><th class="num" style="width:90px">人数</th><th style="text-align:center;width:60px">操作</th></tr></thead><tbody>'+
+      deps.map(d=>`<tr><td><b>${esc(d)}</b></td><td class="num">${db.members.filter(m=>m.dept===d).length}</td>
+        <td style="text-align:center"><button class="icon-btn del" onclick="delDept('${esc(d).replace(/'/g,"\\'")}')">🗑</button></td></tr>`).join('')+
+      '</tbody></table></div>'):'<div class="empty">暂无部门，请在上方添加</div>';
+  }
+}
+
+/* ================= Import / Export ================= */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  dl(blob,`人员到岗绩效数据_${todayStr()}.json`);toast('已导出备份','ok');
+}
+function importJSON(input){
+  if(roGuard())return;
+  const f=input.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{const d=JSON.parse(e.target.result);
+      if(!d.members)throw 0;
+      if(!confirm('导入将覆盖当前全部数据，确定继续？'))return;
+      db=d;if(!db.scores)db.scores={};if(!db.dist)db.dist={amount:'',mode:'score'};
+      save();initUI();toast('数据已导入','ok');
+    }catch(err){toast('文件格式不正确','err');}
+  };rd.readAsText(f);input.value='';
+}
+function exportCSV(){
+  let rows=[['姓名','岗位','部门','类型','到岗日期','离岗日期','本段天数','加班天数','状态','备注']];
+  [...db.records].sort((a,b)=>a.start.localeCompare(b.start)).forEach(r=>{
+    const m=memberById(r.member)||{};
+    rows.push([m.name||'',m.role||'',m.dept||'',r.resident===false?'非常驻':'常驻',r.start,r.end||'在岗中',recordDays(r),(r.overtime||[]).length,r.end?'已离岗':'在岗',r.note||'']);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  dl(new Blob([csv],{type:'text/csv'}),`在岗明细_${todayStr()}.csv`);toast('已导出 CSV','ok');
+}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);}
+function csvCell(c){return `"${String(c==null?'':c).replace(/"/g,'""')}"`;}
+function toCSV(rows){return '﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');}
+
+// sorted stints + summary for a member
+function memberStints(memberId){return db.records.filter(r=>r.member===memberId).sort((a,b)=>a.start.localeCompare(b.start));}
+function memberSummary(memberId){
+  const st=memberStints(memberId);
+  if(!st.length)return{start:'-',end:'-',days:0,count:0};
+  const start=st[0].start;
+  const hasOpen=st.some(r=>!r.end);
+  const ends=st.map(r=>r.end||todayStr());
+  const end=hasOpen?'在岗中':ends.sort().slice(-1)[0];
+  const days=st.reduce((s,r)=>s+recordDays(r),0);
+  return{start,end,days,count:st.length};
+}
+
+function exportMemberTable(){
+  const id=document.getElementById('exp_member').value;
+  if(!id){toast('请先选择成员','err');return;}
+  const m=memberById(id);const st=memberStints(id);const sum=memberSummary(id);
+  const rows=[
+    ['项目部人员在岗统计表'],
+    ['姓名',m.name,'岗位',m.role||'-'],
+    ['部门',m.dept||'-','统计日期',todayStr()],
+    [],
+    ['序号','到岗日期','离岗日期','本次天数','备注']
+  ];
+  st.forEach((r,i)=>rows.push([i+1,r.start,r.end||'在岗中',recordDays(r),r.note||'']));
+  rows.push(['合计 / 总计',sum.start,sum.end,sum.days,`共 ${sum.count} 次到岗`]);
+  dl(new Blob([toCSV(rows)],{type:'text/csv'}),`在岗统计表_${m.name}_${todayStr()}.csv`);
+  toast('已导出 '+m.name+' 在岗统计表','ok');
+}
+
+function exportAllTable(){
+  if(!db.members.length){toast('暂无成员','err');return;}
+  const rows=[
+    ['项目部全员在岗统计表  （统计日期：'+todayStr()+'）'],
+    [],
+    ['姓名','岗位','部门','序号','到岗日期','离岗日期','本次天数','备注','总起始日期','总截止日期','总到岗次数','总天数']
+  ];
+  sortedMembers().forEach(m=>{
+    const st=memberStints(m.id);const sum=memberSummary(m.id);
+    if(!st.length){
+      rows.push([m.name,m.role||'-',m.dept||'-','-','-','-',0,'','-','-',0,0]);
+    }else{
+      st.forEach((r,i)=>{
+        rows.push([
+          i===0?m.name:'', i===0?(m.role||'-'):'', i===0?(m.dept||'-'):'',
+          i+1, r.start, r.end||'在岗中', recordDays(r), r.note||'',
+          i===0?sum.start:'', i===0?sum.end:'', i===0?sum.count:'', i===0?sum.days:''
+        ]);
+      });
+    }
+  });
+  rows.push([]);
+  rows.push(['全员合计','','','','','','','','','','',db.records.reduce((s,r)=>s+recordDays(r),0)]);
+  dl(new Blob([toCSV(rows)],{type:'text/csv'}),`全员在岗统计表_${todayStr()}.csv`);
+  toast('已导出全员在岗统计表','ok');
+}
+
+function exportYearlyTable(){
+  if(!db.members.length){toast('暂无成员','err');return;}
+  const years=[2026,2027,2028,2029];
+  const rows=[
+    [`项目部年度在岗统计表 2026—2029（单位：人天，统计日期：${todayStr()}）`],
+    [],
+    ['姓名','岗位','部门',...years.map(y=>y+'年'),'合计']
+  ];
+  sortedMembers().forEach(m=>{
+    const cells=years.map(y=>daysInPeriod(m.id,String(y)));
+    rows.push([m.name,m.role||'-',m.dept||'-',...cells,cells.reduce((a,b)=>a+b,0)]);
+  });
+  const colTot=years.map(y=>db.members.reduce((s,m)=>s+daysInPeriod(m.id,String(y)),0));
+  rows.push(['合计','','',...colTot,colTot.reduce((a,b)=>a+b,0)]);
+  dl(new Blob([toCSV(rows)],{type:'text/csv'}),`年度在岗统计表_2026-2029_${todayStr()}.csv`);
+  toast('已导出年度统计表','ok');
+}
+
+// build month matrix rows for one year (member × 12 months + totals)
+function monthlyRowsForYear(year){
+  const months=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const rows=[['姓名','岗位',...months.map(m=>m+'月'),'年合计']];
+  sortedMembers().forEach(m=>{
+    const cells=months.map(mo=>daysInMonth(m.id,year,mo));
+    rows.push([m.name,m.role||'-',...cells,cells.reduce((a,b)=>a+b,0)]);
+  });
+  const colTot=months.map(mo=>db.members.reduce((s,m)=>s+daysInMonth(m.id,year,mo),0));
+  rows.push(['月合计','',...colTot,colTot.reduce((a,b)=>a+b,0)]);
+  return rows;
+}
+function exportMonthlyTable(){
+  if(!db.members.length){toast('暂无成员','err');return;}
+  const year=Number(document.getElementById('monthYear').value)||2026;
+  const rows=[[`项目部 ${year} 年度月度在岗统计表（单位：人天，统计日期：${todayStr()}）`],[],...monthlyRowsForYear(year)];
+  dl(new Blob([toCSV(rows)],{type:'text/csv'}),`月度在岗统计表_${year}年_${todayStr()}.csv`);
+  toast(`已导出 ${year} 年度月度统计表`,'ok');
+}
+function exportMonthlyAllYears(){
+  if(!db.members.length){toast('暂无成员','err');return;}
+  let rows=[[`项目部月度在岗统计表 2026—2029（单位：人天，统计日期：${todayStr()}）`]];
+  [2026,2027,2028,2029].forEach(year=>{
+    rows.push([]);
+    rows.push([`【${year} 年度】`]);
+    rows=rows.concat(monthlyRowsForYear(year));
+  });
+  dl(new Blob([toCSV(rows)],{type:'text/csv'}),`月度在岗统计表_2026-2029_${todayStr()}.csv`);
+  toast('已导出全年度月度统计表','ok');
+}
+
+/* ----- Print formal performance report ----- */
+function printPerfReport(){
+  const amt=Number(document.getElementById('totalAmount').value)||0;
+  const mode=db.dist.mode;
+  const periodTxt=periodLabel(curPeriod);
+  const rows=db.members.map(m=>{
+    const comp=composite(curPeriod,m.id);
+    const d=daysInPeriod(m.id,curPeriod);
+    const weight=mode==='scoreday'?comp*d:comp;
+    return{m,comp,d,weight};
+  });
+  const wsum=rows.reduce((s,r)=>s+r.weight,0);
+  rows.forEach(r=>{r.ratio=wsum>0?r.weight/wsum:0;r.amount=amt*r.ratio;});
+  rows.sort((a,b)=>b.amount-a.amount||b.comp-a.comp);
+  const bodyRows=rows.map((r,i)=>{
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${esc(r.m.name)}</td>
+      <td>${esc(r.m.role||'未分类')}</td>
+      <td>${esc(r.m.dept||'-')}</td>
+      <td style="text-align:center">${r.d}</td>
+      <td style="text-align:center;font-weight:bold">${r.comp}</td>
+      <td style="text-align:center">${(r.ratio*100).toFixed(2)}%</td>
+      <td style="text-align:right;font-weight:bold">${(Math.round(r.amount*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('');
+  const totalAmt=rows.reduce((s,r)=>s+r.amount,0);
+  const html=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>绩效考核分配表</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:"SimSun","宋体","Microsoft YaHei",serif;color:#000;padding:34px 30px;font-size:13px}
+    .doc-title{text-align:center;font-size:22px;font-weight:bold;letter-spacing:2px;font-family:"SimHei","黑体",sans-serif;margin-bottom:6px}
+    .doc-sub{text-align:center;font-size:14px;margin-bottom:4px}
+    .meta{display:flex;justify-content:space-between;font-size:12.5px;margin:14px 2px 10px}
+    table{width:100%;border-collapse:collapse;margin-top:6px}
+    th,td{border:1px solid #000;padding:6px 5px;font-size:12px}
+    th{background:#f0f0f0;text-align:center;font-weight:bold}
+    tfoot td{font-weight:bold;background:#f7f7f7}
+    .total-line{margin-top:12px;font-size:13.5px;text-align:right;padding-right:4px}
+    .note{margin-top:14px;font-size:11.5px;color:#333;line-height:1.9}
+    .sign{display:flex;justify-content:space-between;margin-top:46px;font-size:13px;padding:0 6px}
+    .sign .col{width:30%}
+    .sign .line{border-bottom:1px solid #000;display:inline-block;width:120px;margin-left:6px}
+    .foot-date{text-align:right;margin-top:40px;font-size:13px;padding-right:6px}
+    @media print{body{padding:18px}@page{size:A4 landscape;margin:12mm}}
+  </style></head><body>
+    <div class="doc-title">哈尔乌素二期采空区治理项目部</div>
+    <div class="doc-sub">绩 效 考 核 与 分 配 表</div>
+    <div class="meta">
+      <span>考核周期：${periodTxt}</span>
+      <span>绩效总金额：￥${amt.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      <span>制表日期：${todayStr()}</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:44px">序号</th><th style="width:80px">姓名</th><th style="width:96px">岗位</th><th style="width:110px">部门</th><th style="width:64px">在岗<br>天数</th>
+        <th style="width:64px">综合<br>得分</th><th style="width:64px">分配<br>占比</th><th style="width:110px">绩效金额(元)</th>
+      </tr></thead>
+      <tbody>${bodyRows||'<tr><td colspan="8" style="text-align:center;padding:18px">暂无数据</td></tr>'}</tbody>
+      <tfoot><tr>
+        <td colspan="6" style="text-align:center">合 计</td>
+        <td style="text-align:center">100.00%</td>
+        <td style="text-align:right">${(Math.round(totalAmt*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      </tr></tfoot>
+    </table>
+    <div class="note">
+      说明：1. 综合得分 = Σ（各指标得分 × 权重）；其中「在岗时长」得分由系统按实际驻场天数自动核算。<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. 绩效金额按${mode==='scoreday'?'综合得分×在岗天数加权':'综合得分占比'}分配，合计与绩效总金额一致。<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3. 本表经被考核人确认、考核人复核、项目负责人审批后生效。
+    </div>
+    <div class="sign">
+      <div class="col">被考核人（本人）签字：<span class="line"></span></div>
+      <div class="col">考核人签字：<span class="line"></span></div>
+      <div class="col">审批人（项目负责人）签字：<span class="line"></span></div>
+    </div>
+    <div class="foot-date">年　　月　　日</div>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+  const w=window.open('','_blank');
+  if(!w){toast('请允许浏览器弹出窗口以打印','err');return;}
+  w.document.write(html);w.document.close();
+}
+
+function resetAll(){
+  if(roGuard())return;
+  if(!confirm('确定清空全部数据？此操作不可恢复，建议先导出备份。'))return;
+  db=blankDB();save();initUI();toast('已清空','ok');
+}
+function loadDemo(){
+  if(roGuard())return;
+  if(db.members.length && !confirm('载入示例数据将覆盖现有数据，确定？'))return;
+  db=blankDB();
+  // [name, 岗位(匹配岗位类别), 部门, 电话]
+  const M=[
+    ['赵建国','项目经理','沈阳设计院','13800000001'],
+    ['李振华','技术经理','沈阳设计院','13800000002'],
+    ['王安平','安全经理','煤科院','13800000003'],
+    ['张建生','生产经理','煤科院','13800000004'],
+    ['刘机电','机电经理','沈阳设计院-劳务','13800000005'],
+    ['钱副经','副经理','煤科院','13800000006'],
+    ['孙守安','安全员','煤科院-劳务','13800000007'],
+    ['陈技术','技术人员','沈阳设计院-劳务','13800000008'],
+    ['吴测量','技术人员','沈阳设计院','13800000009'],
+    ['周文档','资料员','煤科院-劳务','13800000010']
+  ];
+  M.forEach(x=>db.members.push({id:uid(),name:x[0],role:x[1],dept:x[2],phone:x[3]}));
+  const ids=db.members.map(m=>m.id);
+  function rec(i,s,e,n,resident,overtime){db.records.push({id:uid(),member:ids[i],start:s,end:e,note:n,resident:resident!==false,overtime:overtime||[]});}
+  db.holidays=[{id:uid(),start:'2026-10-01',end:'2026-10-07',name:'国庆节'},{id:uid(),start:'2026-05-01',end:'2026-05-05',name:'劳动节'}];
+  rec(0,'2026-01-05','2026-06-30','一季度驻场');
+  rec(0,'2026-08-01','',  '现场驻守');
+  rec(1,'2026-02-01','2026-12-20','技术负责');
+  rec(1,'2027-03-01','','');
+  rec(2,'2026-01-05','',  '常驻安全管理');
+  rec(3,'2026-03-15','2026-11-30','生产组织');
+  rec(4,'2026-04-01','2026-10-15','机电保障（非常驻）',false,['2026-10-04']);
+  rec(5,'2026-03-01','',  '分管现场');
+  rec(6,'2026-05-01','2026-09-30','安全巡查（非常驻）',false,['2026-05-02']);
+  rec(7,'2026-06-01','',  '现场技术');
+  rec(8,'2026-05-15','2026-11-30','测量监测');
+  rec(9,'2026-04-01','2026-12-31','内业资料');
+  // sample scores for 全周期: random-ish 80-96 for each member's manual KPIs
+  db.scores['全周期']={};
+  db.members.forEach((m,mi)=>{
+    db.scores['全周期'][m.id]={};
+    const kpis=kpisForMember(m);
+    kpis.filter(k=>!k.auto).forEach((k,ki)=>{
+      db.scores['全周期'][m.id][k.id]=80+((mi*3+ki*7)%17); // 80-96 deterministic spread
+    });
+  });
+  db.dist={amount:'200000',mode:'score'};
+  save();curYear='全周期';curMonth='';refreshPeriod();initUI();toast('已载入示例数据','ok');
+}
+
+/* ================= UI plumbing ================= */
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className=(type||'')+' show';setTimeout(()=>t.className=t.className.replace('show','').trim(),2200);}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+document.querySelectorAll('.nav-item').forEach(n=>n.onclick=()=>{
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  n.classList.add('active');document.getElementById('page-'+n.dataset.page).classList.add('active');
+});
+document.getElementById('editModal').addEventListener('click',e=>{if(e.target.id==='editModal')closeModal('editModal');});
+
+function initUI(){
+  setVal('r_start',todayStr());
+  document.getElementById('totalAmount').value=db.dist.amount||'';
+  document.getElementById('distMode').value=db.dist.mode||'score';
+  buildPeriodSegs();
+  renderAll();
+}
+
+/* ================= Sharing: admin generates, viewers unlock ================= */
+// Admin (local) → generate encrypted data.json for upload to GitHub
+async function makeShare(){
+  if(READONLY)return;
+  if(!window.crypto||!crypto.subtle){toast('当前环境不支持加密，请用 Chrome/Edge 打开','err');return;}
+  if(!db.members.length && !confirm('当前没有数据，仍要生成共享文件吗？'))return;
+  const pass=prompt('① 设置「查看口令」（发给查看人员，请牢记，丢失无法找回）：');
+  if(!pass)return;
+  if(pass.length<4){toast('口令至少 4 位','err');return;}
+  const pass2=prompt('② 再次输入口令确认：');
+  if(pass!==pass2){toast('两次口令不一致，请重试','err');return;}
+  try{
+    const payload={meta:{updated:new Date().toLocaleString('zh-CN',{hour12:false}),app:'hews-attendance'},data:db};
+    const blob=await encryptData(payload,pass);
+    dl(new Blob([JSON.stringify(blob)],{type:'application/json'}),'data.json');
+    toast('已生成加密文件 data.json，请上传到 GitHub 仓库','ok');
+    setTimeout(()=>alert('已下载 data.json（加密）。\n\n下一步：把这个文件上传/替换到你的 GitHub 仓库根目录，几分钟后查看者刷新网页即可看到最新数据。\n\n请记住你设置的口令，并发给需要查看的同事。'),300);
+  }catch(e){toast('生成失败：'+e.message,'err');}
+}
+
+// Viewer (online) → decrypt with passphrase
+async function doUnlock(){
+  const pass=val('ulPass');
+  const errEl=document.getElementById('ulErr');
+  if(!pass){errEl.textContent='请输入口令';return;}
+  if(!window.crypto||!crypto.subtle){errEl.textContent='当前浏览器不支持解密，请用 Chrome/Edge';return;}
+  errEl.textContent='正在解锁…';
+  try{
+    const payload=await decryptData(_encBlob,pass);
+    db=payload.data||payload;       // support both {meta,data} and raw db
+    if(!db.roles)db.roles=defaultRoles();
+    if(!db.scores)db.scores={};
+    if(!db.dist)db.dist={amount:'',mode:'score'};
+    if(payload.meta&&payload.meta.updated){document.getElementById('dataMeta').textContent='　·　数据发布于 '+payload.meta.updated;}
+    document.getElementById('unlockBg').classList.remove('show');
+    initUI();
+    toast('已解锁（只读）','ok');
+  }catch(e){
+    errEl.textContent='口令错误，请重试';
+  }
+}
+
+// Decide mode on startup
+async function boot(){
+  try{
+    const r=await fetch('data.json',{cache:'no-store'});
+    if(r.ok){
+      const t=(await r.text()).trim();
+      if(t){const blob=JSON.parse(t); if(blob&&blob.ct){_encBlob=blob;}}
+    }
+  }catch(e){/* file:// or no data.json → admin mode */}
+  if(_encBlob){
+    READONLY=true;
+    document.body.classList.add('readonly');
+    document.getElementById('unlockBg').classList.add('show');
+    setTimeout(()=>{const p=document.getElementById('ulPass');if(p)p.focus();},100);
+  }else{
+    initUI();
+  }
+}
+boot();
+
+/* ================= 3D animated background (VANTA + three.js) ================= */
+const BG_KEY='hews_bg_3d';
+let vantaEffect=null;
+function vantaOpts(type){
+  const base={el:'#vanta-bg',mouseControls:true,touchControls:true,gyroControls:false,minHeight:200,minWidth:200,scale:1,scaleMobile:1,backgroundColor:0x0e1525};
+  if(type==='net')return Object.assign(base,{color:0xe8b04b,points:11,maxDistance:23,spacing:18,showDots:true});
+  return Object.assign(base,{color:0xe8b04b,color2:0x39c6c0,size:1.15}); // globe
+}
+function setBg(type){
+  localStorage.setItem(BG_KEY,type);
+  document.getElementById('bgSel').value=type;
+  if(vantaEffect){try{vantaEffect.destroy();}catch(e){}vantaEffect=null;}
+  // libs missing (offline without lib/) → keep static gradient
+  if(typeof window.VANTA==='undefined'||typeof window.THREE==='undefined'){
+    document.body.classList.remove('vanta-on');return;
+  }
+  if(type==='off'){document.body.classList.remove('vanta-on');return;}
+  document.body.classList.add('vanta-on');
+  try{
+    const fn=(type==='net')?window.VANTA.NET:window.VANTA.GLOBE;
+    vantaEffect=fn(vantaOpts(type));
+  }catch(e){document.body.classList.remove('vanta-on');}
+}
+// init after libs are parsed
+window.addEventListener('load',()=>setBg(localStorage.getItem(BG_KEY)||'globe'));
+</script>
+</body>
+</html>
