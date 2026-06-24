@@ -347,18 +347,33 @@
 
       <div class="grid cards-2" style="margin-top:16px">
         <div class="panel">
-          <div class="panel-head"><h3>📍 当前在岗人员</h3></div>
+          <div class="panel-head"><h3>📍 当前在岗人员 <span class="pill" id="onDutyCount"></span></h3></div>
           <div id="onDutyList"></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><h3>🏆 累计在岗时长 TOP</h3></div>
-          <div id="topDays"></div>
+          <div class="panel-head"><h3>🌙 当前离岗人员 <span class="pill" id="offDutyCount"></span></h3></div>
+          <div id="offDutyList"></div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h3>📆 年度在岗人天分布（2026—2029）</h3></div>
-        <div id="yearChart"></div>
+        <div class="panel-head"><h3>🏢 各单位在岗 / 离岗人数统计</h3></div>
+        <div class="desc">实时对比各单位当前在岗与离岗人数。</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>单位（部门）</th><th class="num">在岗</th><th class="num">离岗</th><th class="num">合计</th><th class="num">在岗率</th></tr></thead>
+          <tbody id="deptStatBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="grid cards-2">
+        <div class="panel">
+          <div class="panel-head"><h3>🏆 累计在岗时长 TOP</h3></div>
+          <div id="topDays"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>📆 年度在岗人天分布（2026—2029）</h3></div>
+          <div id="yearChart"></div>
+        </div>
       </div>
     </section>
 
@@ -381,16 +396,8 @@
       <div class="panel">
         <div class="panel-head"><h3>👥 成员名单</h3><span class="pill" id="memberCount"></span></div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>电话</th><th>状态</th><th class="num">本段在岗</th><th class="num">累计在岗</th><th style="text-align:center">操作</th></tr></thead>
+          <thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>电话</th><th>状态</th><th class="num">本段在岗</th><th class="num">本次离岗</th><th class="num">累计在岗</th><th style="text-align:center">操作</th></tr></thead>
           <tbody id="memberBody"></tbody>
-        </table></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h3>🏢 各单位在岗 / 离岗人数统计</h3></div>
-        <div class="desc">实时对比各单位当前在岗与离岗人数。</div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>单位（部门）</th><th class="num">在岗</th><th class="num">离岗</th><th class="num">合计</th><th class="num">在岗率</th></tr></thead>
-          <tbody id="deptStatBody"></tbody>
         </table></div>
       </div>
     </section>
@@ -902,6 +909,18 @@ function currentStint(memberId){
   return open?recordDays(open):0;
 }
 function isOnDuty(memberId){return db.records.some(r=>r.member===memberId && !r.end);}
+// 最近一次离岗日期（最大 end）；无则空
+function lastDeparture(memberId){
+  const ended=db.records.filter(r=>r.member===memberId && r.end);
+  return ended.length?ended.sort((a,b)=>b.end.localeCompare(a.end))[0].end:'';
+}
+// 本次离岗天数：离岗当日仍算在岗，故从离岗次日计至今
+function currentOffDays(memberId){
+  if(isOnDuty(memberId))return 0;
+  const d=lastDeparture(memberId);
+  if(!d)return 0;
+  return Math.max(0,daysBetween(d,todayStr())-1);
+}
 function daysInPeriod(memberId,period){
   const recs=db.records.filter(r=>r.member===memberId);
   if(period==='全周期') return recs.reduce((s,r)=>s+recordDays(r),0);
@@ -1168,13 +1187,13 @@ function selVal(id,value){
 function renderDash(){
   document.getElementById('today').textContent=todayStr();
   const onDuty=sortedMembers().filter(m=>isOnDuty(m.id));
+  const offDuty=sortedMembers().filter(m=>!isOnDuty(m.id));
   const totalManDays=db.records.reduce((s,r)=>s+recordDays(r),0);
-  const avg=db.members.length?Math.round(totalManDays/db.members.length):0;
   const cards=[
     {label:'项目部成员',val:db.members.length,unit:'人',ic:'👥',cls:'bi-blue',foot:'在册总人数'},
     {label:'当前在岗',val:onDuty.length,unit:'人',ic:'📍',cls:'bi-green',foot:onDuty.length?onDuty.slice(0,3).map(m=>m.name).join('、')+(onDuty.length>3?' 等':''):'暂无在岗'},
-    {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold',foot:'全部记录合计'},
-    {label:'人均在岗',val:avg,unit:'天',ic:'📈',cls:'bi-teal',foot:'累计 ÷ 成员数'}
+    {label:'当前离岗',val:offDuty.length,unit:'人',ic:'🌙',cls:'bi-purple',foot:offDuty.length?offDuty.slice(0,3).map(m=>m.name).join('、')+(offDuty.length>3?' 等':''):'全员在岗'},
+    {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold',foot:'全部记录合计'}
   ];
   document.getElementById('dashStats').innerHTML=cards.map(c=>`
     <div class="card stat">
@@ -1185,15 +1204,28 @@ function renderDash(){
     </div>`).join('');
 
   // on duty list
+  document.getElementById('onDutyCount').textContent=onDuty.length+' 人';
+  document.getElementById('offDutyCount').textContent=offDuty.length+' 人';
   const od=document.getElementById('onDutyList');
   if(!onDuty.length){od.innerHTML='<div class="empty"><div class="big">🌙</div>当前无人在岗</div>';}
   else{
-    od.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>到岗日期</th><th class="num">本次在岗</th></tr></thead><tbody>'+
+    od.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>到岗日期</th><th class="num">本次在岗</th></tr></thead><tbody>'+
       onDuty.map(m=>{
         const open=db.records.filter(r=>r.member===m.id&&!r.end).sort((a,b)=>b.start.localeCompare(a.start))[0];
-        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${open.start}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td></tr>`;
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${open.start}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
+  // off duty list
+  const offl=document.getElementById('offDutyList');
+  if(!offDuty.length){offl.innerHTML='<div class="empty"><div class="big">📍</div>全员在岗</div>';}
+  else{
+    offl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>最近离岗</th><th class="num">本次离岗</th></tr></thead><tbody>'+
+      offDuty.map(m=>{
+        const last=db.records.filter(r=>r.member===m.id&&r.end).sort((a,b)=>b.end.localeCompare(a.end))[0];
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${last?last.end:'<span style="color:var(--txt-mut)">无记录</span>'}</td><td class="num"><span class="tag tag-off">${currentOffDays(m.id)} 天</span></td></tr>`;
+      }).join('')+'</tbody></table></div>';
+  }
+  renderDeptStats();
 
   // top days
   const ranked=[...db.members].map(m=>({m,d:totalDays(m.id)})).sort((a,b)=>b.d-a.d).slice(0,8);
@@ -1224,7 +1256,7 @@ function renderYearChart(elId){
 function renderMembers(){
   document.getElementById('memberCount').textContent=`共 ${db.members.length} 人`;
   const b=document.getElementById('memberBody');
-  if(!db.members.length){b.innerHTML='<tr><td colspan="8"><div class="empty"><div class="big">👤</div>暂无成员，请在上方添加</div></td></tr>';return;}
+  if(!db.members.length){b.innerHTML='<tr><td colspan="9"><div class="empty"><div class="big">👤</div>暂无成员，请在上方添加</div></td></tr>';return;}
   b.innerHTML=sortedMembers().map(m=>`
     <tr>
       <td><b>${esc(m.name)}</b></td>
@@ -1233,13 +1265,13 @@ function renderMembers(){
       <td>${esc(m.phone||'-')}</td>
       <td>${isOnDuty(m.id)?'<span class="tag tag-on">在岗</span>':'<span class="tag tag-off">离岗</span>'}</td>
       <td class="num">${isOnDuty(m.id)?`<span class="tag tag-on">${currentStint(m.id)} 天</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td>
+      <td class="num">${isOnDuty(m.id)?'<span style="color:var(--txt-mut)">—</span>':`<span class="tag tag-off">${currentOffDays(m.id)} 天</span>`}</td>
       <td class="num">${totalDays(m.id)} 天</td>
       <td style="text-align:center;white-space:nowrap">
         <button class="icon-btn" title="编辑" onclick="openEdit('${m.id}')">✏️</button>
         <button class="icon-btn del" title="删除" onclick="delMember('${m.id}')">🗑</button>
       </td>
     </tr>`).join('');
-  renderDeptStats();
 }
 function renderDeptStats(){
   const tb=document.getElementById('deptStatBody');if(!tb)return;
