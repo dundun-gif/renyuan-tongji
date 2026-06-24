@@ -161,6 +161,7 @@
   .tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
   .tag-on{background:rgba(70,201,139,.16);color:var(--green)}
   .tag-off{background:rgba(107,120,150,.18);color:var(--txt-dim)}
+  .tag-warn{background:rgba(232,176,75,.16);color:var(--gold-soft)}
   .pill{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;background:rgba(255,255,255,.06);color:var(--txt-dim)}
 
   .empty{text-align:center;padding:40px 20px;color:var(--txt-mut);font-size:13px}
@@ -182,6 +183,9 @@
   .modal-bg.show{display:flex}
   .modal{background:var(--panel-solid);border:1px solid var(--line-strong);border-radius:18px;padding:26px;width:min(520px,100%);box-shadow:var(--shadow)}
   .modal h3{font-size:17px;margin-bottom:18px}
+  .lv-opt{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--line-strong);border-radius:11px;cursor:pointer;transition:.15s}
+  .lv-opt:hover{background:rgba(255,255,255,.04)}
+  .lv-opt input{width:auto;margin-top:3px;accent-color:var(--gold)}
 
   /* toast */
   #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel-solid);border:1px solid var(--line-strong);color:var(--txt);padding:12px 20px;border-radius:11px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.3s;z-index:300;font-size:13px}
@@ -649,6 +653,25 @@
   </div>
 </div>
 
+<!-- leave (departure) modal -->
+<div class="modal-bg" id="leaveModal">
+  <div class="modal">
+    <h3>登记离岗</h3>
+    <input type="hidden" id="lv_id">
+    <div style="display:grid;gap:14px">
+      <label class="lv-opt"><input type="radio" name="lvType" value="now" onchange="toggleLeaveDate()" checked>
+        <span><b>立即离岗</b>（今天 <span id="lv_today"></span>）<br><span style="font-size:11.5px;color:var(--txt-mut)">即刻将状态改为离岗</span></span></label>
+      <label class="lv-opt"><input type="radio" name="lvType" value="plan" onchange="toggleLeaveDate()">
+        <span><b>预计离岗</b><br><span style="font-size:11.5px;color:var(--txt-mut)">选择今后日期，日期到达前仍显示在岗，到达后自动转离岗</span></span></label>
+      <div id="lv_dateWrap" style="padding-left:26px"><input type="date" id="lv_date"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
+      <button class="btn btn-ghost" onclick="closeModal('leaveModal')">取消</button>
+      <button class="btn btn-gold" onclick="confirmLeave()">确定</button>
+    </div>
+  </div>
+</div>
+
 <div class="unlock-bg" id="unlockBg">
   <div class="unlock-card">
     <div class="logo" style="margin:0 auto 14px">岗</div>
@@ -867,7 +890,9 @@ function eachDay(s,e,cb){let d=parseD(s);const end=parseD(e);while(d<=end){cb(d)
 // core: on-site days of a record within an arbitrary [winStart,winEnd] window (inclusive)
 // 常驻(resident): all calendar days. 非常驻: weekdays − 节假日(工作日) + 加班(休息日上班)
 function recordDaysInRange(rec,winStart,winEnd){
-  const realEnd = rec.end ? rec.end : todayStr();
+  // 离岗日期若是未来（预计离岗），实际在岗只计到今天为止
+  const today=todayStr();
+  const realEnd = (rec.end && rec.end<today) ? rec.end : today;
   const s = rec.start>winStart ? rec.start : winStart;
   const e = realEnd<winEnd ? realEnd : winEnd;
   if(s>e) return 0;
@@ -904,14 +929,21 @@ function memberById(id){return db.members.find(m=>m.id===id);}
 function totalDays(memberId){
   return db.records.filter(r=>r.member===memberId).reduce((s,r)=>s+recordDays(r),0);
 }
-function currentStint(memberId){
-  const open=db.records.filter(r=>r.member===memberId && !r.end).sort((a,b)=>b.start.localeCompare(a.start))[0];
-  return open?recordDays(open):0;
+// 记录是否"当前生效"（在岗）：无离岗日期，或离岗日期为未来（预计离岗，未到期）
+function recActive(r){return !r.end || r.end>todayStr();}
+function activeRecord(memberId){
+  return db.records.filter(r=>r.member===memberId && recActive(r)).sort((a,b)=>b.start.localeCompare(a.start))[0];
 }
-function isOnDuty(memberId){return db.records.some(r=>r.member===memberId && !r.end);}
-// 最近一次离岗日期（最大 end）；无则空
+function currentStint(memberId){const r=activeRecord(memberId);return r?recordDays(r):0;}
+function isOnDuty(memberId){return db.records.some(r=>r.member===memberId && recActive(r));}
+// 预计离岗日期（在岗中、且已设未来离岗日的记录）
+function plannedDeparture(memberId){
+  const r=activeRecord(memberId);
+  return (r&&r.end)?r.end:'';
+}
+// 最近一次实际离岗日期（已到期的最大 end）；无则空
 function lastDeparture(memberId){
-  const ended=db.records.filter(r=>r.member===memberId && r.end);
+  const ended=db.records.filter(r=>r.member===memberId && r.end && r.end<=todayStr());
   return ended.length?ended.sort((a,b)=>b.end.localeCompare(a.end))[0].end:'';
 }
 // 本次离岗天数：离岗当日仍算在岗，故从离岗次日计至今
@@ -987,12 +1019,39 @@ function delRecord(id){
 }
 function closeRecord(id){
   if(roGuard())return;
-  const r=db.records.find(x=>x.id===id);
-  const d=prompt('填写离岗日期 (YYYY-MM-DD)：',todayStr());
-  if(!d)return;
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('日期格式不正确','err');return;}
+  const r=db.records.find(x=>x.id===id);if(!r)return;
+  setVal('lv_id',id);
+  document.getElementById('lv_today').textContent=todayStr();
+  // 预计离岗日期最早为明天
+  const t=parseD(todayStr());const tmr=new Date(t.getFullYear(),t.getMonth(),t.getDate()+1);
+  const tmrStr=fmtD(tmr);
+  const dEl=document.getElementById('lv_date');
+  dEl.min=tmrStr<r.start?r.start:tmrStr;
+  // 若该记录已是预计离岗，预填
+  if(r.end&&r.end>todayStr()){document.querySelector('input[name=lvType][value=plan]').checked=true;dEl.value=r.end;}
+  else{document.querySelector('input[name=lvType][value=now]').checked=true;dEl.value='';}
+  toggleLeaveDate();
+  document.getElementById('leaveModal').classList.add('show');
+}
+function toggleLeaveDate(){
+  const plan=document.querySelector('input[name=lvType]:checked').value==='plan';
+  document.getElementById('lv_dateWrap').style.opacity=plan?'1':'.4';
+  document.getElementById('lv_date').disabled=!plan;
+}
+function confirmLeave(){
+  if(roGuard())return;
+  const r=db.records.find(x=>x.id===val('lv_id'));if(!r)return;
+  const type=document.querySelector('input[name=lvType]:checked').value;
+  let d;
+  if(type==='now'){d=todayStr();}
+  else{
+    d=val('lv_date');
+    if(!d){toast('请选择预计离岗日期','err');return;}
+    if(d<=todayStr()){toast('预计离岗须为今后日期，如今天离岗请选「立即离岗」','err');return;}
+  }
   if(d<r.start){toast('离岗日期不能早于到岗日期','err');return;}
-  r.end=d;save();renderAll();toast('已登记离岗','ok');
+  r.end=d;save();closeModal('leaveModal');renderAll();
+  toast(type==='now'?'已登记立即离岗':('已设预计离岗：'+d),'ok');
 }
 
 /* ================= Holiday functions ================= */
@@ -1209,10 +1268,11 @@ function renderDash(){
   const od=document.getElementById('onDutyList');
   if(!onDuty.length){od.innerHTML='<div class="empty"><div class="big">🌙</div>当前无人在岗</div>';}
   else{
-    od.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>到岗日期</th><th class="num">本次在岗</th></tr></thead><tbody>'+
+    od.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>到岗日期</th><th class="num">本次在岗</th><th>预计离岗</th></tr></thead><tbody>'+
       onDuty.map(m=>{
-        const open=db.records.filter(r=>r.member===m.id&&!r.end).sort((a,b)=>b.start.localeCompare(a.start))[0];
-        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${open.start}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td></tr>`;
+        const act=activeRecord(m.id);
+        const plan=plannedDeparture(m.id);
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${act?act.start:'-'}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td><td>${plan?`<span class="tag tag-warn">${plan}</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
   // off duty list
@@ -1221,8 +1281,8 @@ function renderDash(){
   else{
     offl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>最近离岗</th><th class="num">本次离岗</th></tr></thead><tbody>'+
       offDuty.map(m=>{
-        const last=db.records.filter(r=>r.member===m.id&&r.end).sort((a,b)=>b.end.localeCompare(a.end))[0];
-        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${last?last.end:'<span style="color:var(--txt-mut)">无记录</span>'}</td><td class="num"><span class="tag tag-off">${currentOffDays(m.id)} 天</span></td></tr>`;
+        const last=lastDeparture(m.id);
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${last||'<span style="color:var(--txt-mut)">无记录</span>'}</td><td class="num"><span class="tag tag-off">${currentOffDays(m.id)} 天</span></td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
   renderDeptStats();
@@ -1263,7 +1323,7 @@ function renderMembers(){
       <td>${esc(m.role||'-')}</td>
       <td>${esc(m.dept||'-')}</td>
       <td>${esc(m.phone||'-')}</td>
-      <td>${isOnDuty(m.id)?'<span class="tag tag-on">在岗</span>':'<span class="tag tag-off">离岗</span>'}</td>
+      <td>${isOnDuty(m.id)?(plannedDeparture(m.id)?`<span class="tag tag-warn" title="预计 ${plannedDeparture(m.id)} 离岗">在岗·待离</span>`:'<span class="tag tag-on">在岗</span>'):'<span class="tag tag-off">离岗</span>'}</td>
       <td class="num">${isOnDuty(m.id)?`<span class="tag tag-on">${currentStint(m.id)} 天</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td>
       <td class="num">${isOnDuty(m.id)?'<span style="color:var(--txt-mut)">—</span>':`<span class="tag tag-off">${currentOffDays(m.id)} 天</span>`}</td>
       <td class="num">${totalDays(m.id)} 天</td>
@@ -1308,7 +1368,8 @@ function renderRecords(){
   if(!recs.length){b.innerHTML='<tr><td colspan="9"><div class="empty"><div class="big">📅</div>无匹配记录</div></td></tr>';return;}
   b.innerHTML=recs.map(r=>{
     const m=memberById(r.member)||{name:'(已删除)',role:''};
-    const open=!r.end;
+    const active=recActive(r);                 // 在岗（含预计离岗未到期）
+    const planned=r.end && r.end>todayStr();    // 已设未来离岗日
     const nonRes=r.resident===false;
     const otCnt=(r.overtime||[]).length;
     const typeTag=nonRes
@@ -1319,12 +1380,12 @@ function renderRecords(){
       <td>${esc(m.role||'-')}</td>
       <td>${typeTag}</td>
       <td>${r.start}</td>
-      <td>${r.end||'<span style="color:var(--txt-mut)">— 在岗中 —</span>'}</td>
+      <td>${r.end?(planned?`<span class="tag tag-warn">${r.end}（预计）</span>`:r.end):'<span style="color:var(--txt-mut)">— 在岗中 —</span>'}</td>
       <td class="num">${recordDays(r)} 天</td>
-      <td>${open?'<span class="tag tag-on">在岗</span>':'<span class="tag tag-off">已离岗</span>'}</td>
+      <td>${active?(planned?'<span class="tag tag-warn">在岗·待离</span>':'<span class="tag tag-on">在岗</span>'):'<span class="tag tag-off">已离岗</span>'}</td>
       <td>${esc(r.note||'-')}</td>
       <td style="text-align:center;white-space:nowrap">
-        ${open?`<button class="icon-btn" title="登记离岗" onclick="closeRecord('${r.id}')">🚪</button>`:''}
+        ${active?`<button class="icon-btn" title="登记离岗" onclick="closeRecord('${r.id}')">🚪</button>`:''}
         <button class="icon-btn del" title="删除" onclick="delRecord('${r.id}')">🗑</button>
       </td>
     </tr>`;
@@ -1553,7 +1614,7 @@ function exportCSV(){
   let rows=[['姓名','岗位','部门','类型','到岗日期','离岗日期','本段天数','加班天数','状态','备注']];
   [...db.records].sort((a,b)=>a.start.localeCompare(b.start)).forEach(r=>{
     const m=memberById(r.member)||{};
-    rows.push([m.name||'',m.role||'',m.dept||'',r.resident===false?'非常驻':'常驻',r.start,r.end||'在岗中',recordDays(r),(r.overtime||[]).length,r.end?'已离岗':'在岗',r.note||'']);
+    rows.push([m.name||'',m.role||'',m.dept||'',r.resident===false?'非常驻':'常驻',r.start,r.end?(recActive(r)?r.end+'（预计）':r.end):'在岗中',recordDays(r),(r.overtime||[]).length,recActive(r)?'在岗':'已离岗',r.note||'']);
   });
   const csv='﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   dl(new Blob([csv],{type:'text/csv'}),`在岗明细_${todayStr()}.csv`);toast('已导出 CSV','ok');
@@ -1568,9 +1629,9 @@ function memberSummary(memberId){
   const st=memberStints(memberId);
   if(!st.length)return{start:'-',end:'-',days:0,count:0};
   const start=st[0].start;
-  const hasOpen=st.some(r=>!r.end);
-  const ends=st.map(r=>r.end||todayStr());
-  const end=hasOpen?'在岗中':ends.sort().slice(-1)[0];
+  const hasActive=st.some(r=>recActive(r));
+  const ends=st.filter(r=>r.end&&r.end<=todayStr()).map(r=>r.end);
+  const end=hasActive?'在岗中':(ends.length?ends.sort().slice(-1)[0]:'-');
   const days=st.reduce((s,r)=>s+recordDays(r),0);
   return{start,end,days,count:st.length};
 }
@@ -1811,6 +1872,7 @@ document.querySelectorAll('.nav-item').forEach(n=>n.onclick=()=>{
   n.classList.add('active');document.getElementById('page-'+n.dataset.page).classList.add('active');
 });
 document.getElementById('editModal').addEventListener('click',e=>{if(e.target.id==='editModal')closeModal('editModal');});
+document.getElementById('leaveModal').addEventListener('click',e=>{if(e.target.id==='leaveModal')closeModal('leaveModal');});
 
 function initUI(){
   setVal('r_start',todayStr());
