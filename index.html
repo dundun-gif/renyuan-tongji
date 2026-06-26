@@ -360,11 +360,16 @@
         </div>
       </div>
 
+      <div class="panel" id="pendingPanel">
+        <div class="panel-head"><h3>🕒 预计到岗人员 <span class="pill" id="pendingCount"></span></h3></div>
+        <div id="pendingList"></div>
+      </div>
+
       <div class="panel">
         <div class="panel-head"><h3>🏢 各单位在岗 / 离岗人数统计</h3></div>
-        <div class="desc">实时对比各单位当前在岗与离岗人数。</div>
+        <div class="desc">实时对比各单位当前在岗与离岗人数（未到岗单列）。</div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th>单位（部门）</th><th class="num">在岗</th><th class="num">离岗</th><th class="num">合计</th><th class="num">在岗率</th></tr></thead>
+          <thead><tr><th>单位（部门）</th><th class="num">在岗</th><th class="num">未到岗</th><th class="num">离岗</th><th class="num">合计</th><th class="num">在岗率</th></tr></thead>
           <tbody id="deptStatBody"></tbody>
         </table></div>
       </div>
@@ -413,6 +418,7 @@
       </div>
       <div class="hint">
         💡 <b>使用说明：</b>一名成员可有多段在岗记录。<b>本次在岗时间</b>=当前未结束记录的在岗天数。
+        <b>预计到岗</b>：到岗日期填今后日期，该日到达前显示「未到岗」、不计在岗，到达后自动转为在岗。
         <b>常驻</b>：到岗至离岗按自然日全计；<b>非常驻</b>：自动扣除周末与节假日，仅计工作日，再加上登记的加班日（休息日上班）。
         节假日时间段在下方统一设置，对所有非常驻成员生效。
       </div>
@@ -423,7 +429,7 @@
           <div style="max-width:120px"><label class="fld">是否常驻 *</label>
             <select id="r_resident" onchange="toggleOvertime()"><option value="1">常驻</option><option value="0">非常驻</option></select>
           </div>
-          <div><label class="fld">到岗日期 *</label><input type="date" id="r_start"></div>
+          <div><label class="fld">到岗日期 *（可填今后日期=预计到岗）</label><input type="date" id="r_start"></div>
           <div><label class="fld">离岗日期（在岗中可留空）</label><input type="date" id="r_end"></div>
           <div><label class="fld">备注</label><input id="r_note" placeholder="如：现场驻守 / 出差返回"></div>
           <div style="flex:none"><button class="btn btn-gold" onclick="addRecord()">登记</button></div>
@@ -929,13 +935,22 @@ function memberById(id){return db.members.find(m=>m.id===id);}
 function totalDays(memberId){
   return db.records.filter(r=>r.member===memberId).reduce((s,r)=>s+recordDays(r),0);
 }
-// 记录是否"当前生效"（在岗）：无离岗日期，或离岗日期为未来（预计离岗，未到期）
-function recActive(r){return !r.end || r.end>todayStr();}
+// 记录是否"当前在岗"：到岗日期已到（start<=今天），且未离岗（无离岗日或离岗日为未来）
+function recActive(r){return r.start<=todayStr() && (!r.end || r.end>todayStr());}
+// 记录是否"预计到岗"（未到岗）：到岗日期为今后，且尚未离岗
+function recPending(r){return r.start>todayStr() && (!r.end || r.end>todayStr());}
 function activeRecord(memberId){
   return db.records.filter(r=>r.member===memberId && recActive(r)).sort((a,b)=>b.start.localeCompare(a.start))[0];
 }
 function currentStint(memberId){const r=activeRecord(memberId);return r?recordDays(r):0;}
 function isOnDuty(memberId){return db.records.some(r=>r.member===memberId && recActive(r));}
+// 未到岗：当前不在岗，但有"预计到岗"的记录
+function isPending(memberId){return !isOnDuty(memberId) && db.records.some(r=>r.member===memberId && recPending(r));}
+// 预计到岗日期（最近的未来到岗日）
+function pendingArrival(memberId){
+  const ps=db.records.filter(r=>r.member===memberId && recPending(r)).sort((a,b)=>a.start.localeCompare(b.start));
+  return ps.length?ps[0].start:'';
+}
 // 预计离岗日期（在岗中、且已设未来离岗日的记录）
 function plannedDeparture(memberId){
   const r=activeRecord(memberId);
@@ -1246,12 +1261,13 @@ function selVal(id,value){
 function renderDash(){
   document.getElementById('today').textContent=todayStr();
   const onDuty=sortedMembers().filter(m=>isOnDuty(m.id));
-  const offDuty=sortedMembers().filter(m=>!isOnDuty(m.id));
+  const pending=sortedMembers().filter(m=>isPending(m.id));
+  const offDuty=sortedMembers().filter(m=>!isOnDuty(m.id)&&!isPending(m.id));
   const totalManDays=db.records.reduce((s,r)=>s+recordDays(r),0);
   const cards=[
     {label:'项目部成员',val:db.members.length,unit:'人',ic:'👥',cls:'bi-blue',foot:'在册总人数'},
     {label:'当前在岗',val:onDuty.length,unit:'人',ic:'📍',cls:'bi-green',foot:onDuty.length?onDuty.slice(0,3).map(m=>m.name).join('、')+(onDuty.length>3?' 等':''):'暂无在岗'},
-    {label:'当前离岗',val:offDuty.length,unit:'人',ic:'🌙',cls:'bi-purple',foot:offDuty.length?offDuty.slice(0,3).map(m=>m.name).join('、')+(offDuty.length>3?' 等':''):'全员在岗'},
+    {label:'当前离岗',val:offDuty.length,unit:'人',ic:'🌙',cls:'bi-purple',foot:pending.length?`另有 ${pending.length} 人未到岗`:(offDuty.length?offDuty.slice(0,3).map(m=>m.name).join('、')+(offDuty.length>3?' 等':''):'全员在岗')},
     {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold',foot:'全部记录合计'}
   ];
   document.getElementById('dashStats').innerHTML=cards.map(c=>`
@@ -1283,6 +1299,18 @@ function renderDash(){
       offDuty.map(m=>{
         const last=lastDeparture(m.id);
         return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${last||'<span style="color:var(--txt-mut)">无记录</span>'}</td><td class="num"><span class="tag tag-off">${currentOffDays(m.id)} 天</span></td></tr>`;
+      }).join('')+'</tbody></table></div>';
+  }
+  // pending arrival list
+  document.getElementById('pendingCount').textContent=pending.length+' 人';
+  const pl=document.getElementById('pendingList');
+  if(!pending.length){pl.innerHTML='<div class="empty" style="padding:22px">暂无预计到岗人员</div>';}
+  else{
+    pl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>预计到岗</th><th class="num">距到岗</th></tr></thead><tbody>'+
+      pending.map(m=>{
+        const a=pendingArrival(m.id);
+        const days=a?Math.max(0,daysBetween(todayStr(),a)-1):0;
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td><span class="tag tag-warn">${a}</span></td><td class="num">${days} 天后</td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
   renderDeptStats();
@@ -1323,9 +1351,9 @@ function renderMembers(){
       <td>${esc(m.role||'-')}</td>
       <td>${esc(m.dept||'-')}</td>
       <td>${esc(m.phone||'-')}</td>
-      <td>${isOnDuty(m.id)?(plannedDeparture(m.id)?`<span class="tag tag-warn" title="预计 ${plannedDeparture(m.id)} 离岗">在岗·待离</span>`:'<span class="tag tag-on">在岗</span>'):'<span class="tag tag-off">离岗</span>'}</td>
-      <td class="num">${isOnDuty(m.id)?`<span class="tag tag-on">${currentStint(m.id)} 天</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td>
-      <td class="num">${isOnDuty(m.id)?'<span style="color:var(--txt-mut)">—</span>':`<span class="tag tag-off">${currentOffDays(m.id)} 天</span>`}</td>
+      <td>${isOnDuty(m.id)?(plannedDeparture(m.id)?`<span class="tag tag-warn" title="预计 ${plannedDeparture(m.id)} 离岗">在岗·待离</span>`:'<span class="tag tag-on">在岗</span>'):(isPending(m.id)?`<span class="tag tag-warn" title="预计 ${pendingArrival(m.id)} 到岗">未到岗</span>`:'<span class="tag tag-off">离岗</span>')}</td>
+      <td class="num">${isOnDuty(m.id)?`<span class="tag tag-on">${currentStint(m.id)} 天</span>`:(isPending(m.id)?`<span class="tag tag-warn">预计 ${pendingArrival(m.id)}</span>`:'<span style="color:var(--txt-mut)">—</span>')}</td>
+      <td class="num">${(isOnDuty(m.id)||isPending(m.id))?'<span style="color:var(--txt-mut)">—</span>':`<span class="tag tag-off">${currentOffDays(m.id)} 天</span>`}</td>
       <td class="num">${totalDays(m.id)} 天</td>
       <td style="text-align:center;white-space:nowrap">
         <button class="icon-btn" title="编辑" onclick="openEdit('${m.id}')">✏️</button>
@@ -1338,23 +1366,25 @@ function renderDeptStats(){
   const deps=[...(db.departments||[])];
   // include any member dept not in the list
   db.members.forEach(m=>{if(m.dept && !deps.includes(m.dept))deps.push(m.dept);});
-  const rows=deps.map(d=>{
-    const list=db.members.filter(m=>(m.dept||'')===d);
+  const stat=list=>{
     const on=list.filter(m=>isOnDuty(m.id)).length;
-    return {d,on,off:list.length-on,total:list.length};
-  }).filter(r=>r.total>0);
+    const pend=list.filter(m=>isPending(m.id)).length;
+    return {on,pend,off:list.length-on-pend,total:list.length};
+  };
+  const rows=deps.map(d=>Object.assign({d},stat(db.members.filter(m=>(m.dept||'')===d)))).filter(r=>r.total>0);
   // unclassified
   const noDept=db.members.filter(m=>!m.dept);
-  if(noDept.length){const on=noDept.filter(m=>isOnDuty(m.id)).length;rows.push({d:'未分配部门',on,off:noDept.length-on,total:noDept.length});}
-  if(!rows.length){tb.innerHTML='<tr><td colspan="5"><div class="empty">暂无成员</div></td></tr>';return;}
+  if(noDept.length)rows.push(Object.assign({d:'未分配部门'},stat(noDept)));
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6"><div class="empty">暂无成员</div></td></tr>';return;}
   const fmt=r=>`<tr><td><b>${esc(r.d)}</b></td>
     <td class="num"><span class="tag tag-on">${r.on}</span></td>
+    <td class="num">${r.pend?`<span class="tag tag-warn">${r.pend}</span>`:'<span style="color:var(--txt-mut)">0</span>'}</td>
     <td class="num"><span class="tag tag-off">${r.off}</span></td>
     <td class="num"><b>${r.total}</b></td>
     <td class="num">${r.total?Math.round(r.on/r.total*100):0}%</td></tr>`;
-  const tot={on:rows.reduce((s,r)=>s+r.on,0),off:rows.reduce((s,r)=>s+r.off,0),total:rows.reduce((s,r)=>s+r.total,0)};
+  const tot={on:rows.reduce((s,r)=>s+r.on,0),pend:rows.reduce((s,r)=>s+r.pend,0),off:rows.reduce((s,r)=>s+r.off,0),total:rows.reduce((s,r)=>s+r.total,0)};
   tb.innerHTML=rows.map(fmt).join('')+
-    `<tr style="background:rgba(232,176,75,.06)"><td><b>合计</b></td><td class="num"><b>${tot.on}</b></td><td class="num"><b>${tot.off}</b></td><td class="num"><b>${tot.total}</b></td><td class="num"><b>${tot.total?Math.round(tot.on/tot.total*100):0}%</b></td></tr>`;
+    `<tr style="background:rgba(232,176,75,.06)"><td><b>合计</b></td><td class="num"><b>${tot.on}</b></td><td class="num"><b>${tot.pend}</b></td><td class="num"><b>${tot.off}</b></td><td class="num"><b>${tot.total}</b></td><td class="num"><b>${tot.total?Math.round(tot.on/tot.total*100):0}%</b></td></tr>`;
 }
 
 /* ----- Records ----- */
@@ -1369,6 +1399,7 @@ function renderRecords(){
   b.innerHTML=recs.map(r=>{
     const m=memberById(r.member)||{name:'(已删除)',role:''};
     const active=recActive(r);                 // 在岗（含预计离岗未到期）
+    const pending=recPending(r);                // 预计到岗（到岗日未到）
     const planned=r.end && r.end>todayStr();    // 已设未来离岗日
     const nonRes=r.resident===false;
     const otCnt=(r.overtime||[]).length;
@@ -1379,10 +1410,10 @@ function renderRecords(){
       <td><b>${esc(m.name)}</b></td>
       <td>${esc(m.role||'-')}</td>
       <td>${typeTag}</td>
-      <td>${r.start}</td>
+      <td>${pending?`<span class="tag tag-warn">${r.start}（预计到岗）</span>`:r.start}</td>
       <td>${r.end?(planned?`<span class="tag tag-warn">${r.end}（预计）</span>`:r.end):'<span style="color:var(--txt-mut)">— 在岗中 —</span>'}</td>
       <td class="num">${recordDays(r)} 天</td>
-      <td>${active?(planned?'<span class="tag tag-warn">在岗·待离</span>':'<span class="tag tag-on">在岗</span>'):'<span class="tag tag-off">已离岗</span>'}</td>
+      <td>${pending?'<span class="tag tag-warn">未到岗</span>':(active?(planned?'<span class="tag tag-warn">在岗·待离</span>':'<span class="tag tag-on">在岗</span>'):'<span class="tag tag-off">已离岗</span>')}</td>
       <td>${esc(r.note||'-')}</td>
       <td style="text-align:center;white-space:nowrap">
         ${active?`<button class="icon-btn" title="登记离岗" onclick="closeRecord('${r.id}')">🚪</button>`:''}
@@ -1832,7 +1863,8 @@ function loadDemo(){
     ['孙守安','安全员','煤科院-劳务','13800000007'],
     ['陈技术','技术人员','沈阳设计院-劳务','13800000008'],
     ['吴测量','技术人员','沈阳设计院','13800000009'],
-    ['周文档','资料员','煤科院-劳务','13800000010']
+    ['周文档','资料员','煤科院-劳务','13800000010'],
+    ['郑新到','技术人员','沈阳设计院','13800000011']
   ];
   M.forEach(x=>db.members.push({id:uid(),name:x[0],role:x[1],dept:x[2],phone:x[3]}));
   const ids=db.members.map(m=>m.id);
@@ -1850,6 +1882,8 @@ function loadDemo(){
   rec(7,'2026-06-01','',  '现场技术');
   rec(8,'2026-05-15','2026-11-30','测量监测');
   rec(9,'2026-04-01','2026-12-31','内业资料');
+  // 预计到岗示例（到岗日为今后第 10 天）
+  (function(){const t=parseD(todayStr());const fut=fmtD(new Date(t.getFullYear(),t.getMonth(),t.getDate()+10));rec(10,fut,'','预计到岗');})();
   // sample scores for 全周期: random-ish 80-96 for each member's manual KPIs
   db.scores['全周期']={};
   db.members.forEach((m,mi)=>{
