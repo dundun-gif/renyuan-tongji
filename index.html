@@ -360,11 +360,6 @@
         </div>
       </div>
 
-      <div class="panel" id="pendingPanel">
-        <div class="panel-head"><h3>🕒 预计到岗人员 <span class="pill" id="pendingCount"></span></h3></div>
-        <div id="pendingList"></div>
-      </div>
-
       <div class="panel">
         <div class="panel-head"><h3>🏢 各单位在岗 / 离岗人数统计</h3></div>
         <div class="desc">实时对比各单位当前在岗与离岗人数（未到岗单列）。</div>
@@ -1261,13 +1256,13 @@ function selVal(id,value){
 function renderDash(){
   document.getElementById('today').textContent=todayStr();
   const onDuty=sortedMembers().filter(m=>isOnDuty(m.id));
-  const pending=sortedMembers().filter(m=>isPending(m.id));
-  const offDuty=sortedMembers().filter(m=>!isOnDuty(m.id)&&!isPending(m.id));
+  const offDuty=sortedMembers().filter(m=>!isOnDuty(m.id));   // 含已离岗与未到岗
+  const pending=offDuty.filter(m=>isPending(m.id));
   const totalManDays=db.records.reduce((s,r)=>s+recordDays(r),0);
   const cards=[
     {label:'项目部成员',val:db.members.length,unit:'人',ic:'👥',cls:'bi-blue',foot:'在册总人数'},
     {label:'当前在岗',val:onDuty.length,unit:'人',ic:'📍',cls:'bi-green',foot:onDuty.length?onDuty.slice(0,3).map(m=>m.name).join('、')+(onDuty.length>3?' 等':''):'暂无在岗'},
-    {label:'当前离岗',val:offDuty.length,unit:'人',ic:'🌙',cls:'bi-purple',foot:pending.length?`另有 ${pending.length} 人未到岗`:(offDuty.length?offDuty.slice(0,3).map(m=>m.name).join('、')+(offDuty.length>3?' 等':''):'全员在岗')},
+    {label:'当前离岗',val:offDuty.length,unit:'人',ic:'🌙',cls:'bi-purple',foot:pending.length?`其中 ${pending.length} 人未到岗`:(offDuty.length?offDuty.slice(0,3).map(m=>m.name).join('、')+(offDuty.length>3?' 等':''):'全员在岗')},
     {label:'累计在岗人天',val:totalManDays,unit:'人天',ic:'📅',cls:'bi-gold',foot:'全部记录合计'}
   ];
   document.getElementById('dashStats').innerHTML=cards.map(c=>`
@@ -1291,26 +1286,21 @@ function renderDash(){
         return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${act?act.start:'-'}</td><td class="num"><span class="tag tag-on">${currentStint(m.id)} 天</span></td><td>${plan?`<span class="tag tag-warn">${plan}</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
-  // off duty list
+  // off duty list（含已离岗与未到岗，展示预计到岗时间）
   const offl=document.getElementById('offDutyList');
   if(!offDuty.length){offl.innerHTML='<div class="empty"><div class="big">📍</div>全员在岗</div>';}
   else{
-    offl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>最近离岗</th><th class="num">本次离岗</th></tr></thead><tbody>'+
+    offl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>状态</th><th>最近离岗</th><th class="num">本次离岗</th><th>预计到岗</th></tr></thead><tbody>'+
       offDuty.map(m=>{
         const last=lastDeparture(m.id);
-        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td>${last||'<span style="color:var(--txt-mut)">无记录</span>'}</td><td class="num"><span class="tag tag-off">${currentOffDays(m.id)} 天</span></td></tr>`;
-      }).join('')+'</tbody></table></div>';
-  }
-  // pending arrival list
-  document.getElementById('pendingCount').textContent=pending.length+' 人';
-  const pl=document.getElementById('pendingList');
-  if(!pending.length){pl.innerHTML='<div class="empty" style="padding:22px">暂无预计到岗人员</div>';}
-  else{
-    pl.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>姓名</th><th>岗位</th><th>部门</th><th>预计到岗</th><th class="num">距到岗</th></tr></thead><tbody>'+
-      pending.map(m=>{
-        const a=pendingArrival(m.id);
-        const days=a?Math.max(0,daysBetween(todayStr(),a)-1):0;
-        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td><td><span class="tag tag-warn">${a}</span></td><td class="num">${days} 天后</td></tr>`;
+        const arr=pendingArrival(m.id);
+        const pend=isPending(m.id);
+        const days=arr?Math.max(0,daysBetween(todayStr(),arr)-1):0;
+        return `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.role||'-')}</td><td>${esc(m.dept||'-')}</td>`+
+          `<td>${pend?'<span class="tag tag-warn">未到岗</span>':'<span class="tag tag-off">已离岗</span>'}</td>`+
+          `<td>${last||'<span style="color:var(--txt-mut)">—</span>'}</td>`+
+          `<td class="num">${last?`<span class="tag tag-off">${currentOffDays(m.id)} 天</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td>`+
+          `<td>${arr?`<span class="tag tag-warn">${arr}</span> <span style="font-size:11px;color:var(--txt-mut)">${days}天后</span>`:'<span style="color:var(--txt-mut)">—</span>'}</td></tr>`;
       }).join('')+'</tbody></table></div>';
   }
   renderDeptStats();
