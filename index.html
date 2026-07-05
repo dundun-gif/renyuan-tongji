@@ -453,8 +453,10 @@
           <div class="form-row" style="margin:0;align-items:center">
             <input id="r_search" placeholder="🔍 搜索人名…" style="width:160px" oninput="renderRecords()">
             <select id="r_filter" style="width:160px" onchange="renderRecords()"></select>
+            <button class="btn btn-ghost btn-sm" onclick="clearRecFilter()">✕ 清除筛选</button>
           </div>
         </div>
+        <div id="personHistory" style="display:none"></div>
         <div class="tbl-wrap"><table>
           <thead><tr><th>成员</th><th>岗位</th><th>类型</th><th>到岗</th><th>离岗</th><th class="num">本段天数</th><th>状态</th><th>备注</th><th style="text-align:center">操作</th></tr></thead>
           <tbody id="recordBody"></tbody>
@@ -663,7 +665,7 @@
       <label class="lv-opt"><input type="radio" name="lvType" value="now" onchange="toggleLeaveDate()" checked>
         <span><b>立即离岗</b>（今天 <span id="lv_today"></span>）<br><span style="font-size:11.5px;color:var(--txt-mut)">即刻将状态改为离岗</span></span></label>
       <label class="lv-opt"><input type="radio" name="lvType" value="plan" onchange="toggleLeaveDate()">
-        <span><b>预计离岗</b><br><span style="font-size:11.5px;color:var(--txt-mut)">选择今后日期，日期到达前仍显示在岗，到达后自动转离岗</span></span></label>
+        <span><b>指定离岗日期</b><br><span style="font-size:11.5px;color:var(--txt-mut)">可选<b>以前日期</b>（补登漏登的实际离岗，在岗天数按该日截止同步重算）或<b>今后日期</b>（预计离岗，到期自动转离岗）</span></span></label>
       <div id="lv_dateWrap" style="padding-left:26px"><input type="date" id="lv_date"></div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px">
@@ -1032,11 +1034,9 @@ function closeRecord(id){
   const r=db.records.find(x=>x.id===id);if(!r)return;
   setVal('lv_id',id);
   document.getElementById('lv_today').textContent=todayStr();
-  // 预计离岗日期最早为明天
-  const t=parseD(todayStr());const tmr=new Date(t.getFullYear(),t.getMonth(),t.getDate()+1);
-  const tmrStr=fmtD(tmr);
   const dEl=document.getElementById('lv_date');
-  dEl.min=tmrStr<r.start?r.start:tmrStr;
+  // 离岗日期不得早于到岗日期，但可以是以前或今后日期
+  dEl.min=r.start;
   // 若该记录已是预计离岗，预填
   if(r.end&&r.end>todayStr()){document.querySelector('input[name=lvType][value=plan]').checked=true;dEl.value=r.end;}
   else{document.querySelector('input[name=lvType][value=now]').checked=true;dEl.value='';}
@@ -1056,12 +1056,12 @@ function confirmLeave(){
   if(type==='now'){d=todayStr();}
   else{
     d=val('lv_date');
-    if(!d){toast('请选择预计离岗日期','err');return;}
-    if(d<=todayStr()){toast('预计离岗须为今后日期，如今天离岗请选「立即离岗」','err');return;}
+    if(!d){toast('请选择离岗日期','err');return;}
   }
   if(d<r.start){toast('离岗日期不能早于到岗日期','err');return;}
   r.end=d;save();closeModal('leaveModal');renderAll();
-  toast(type==='now'?'已登记立即离岗':('已设预计离岗：'+d),'ok');
+  const msg=(type==='now')?'已登记立即离岗':(d>todayStr()?('已设预计离岗：'+d):('已补登离岗：'+d));
+  toast(msg,'ok');
 }
 
 /* ================= Holiday functions ================= */
@@ -1378,12 +1378,63 @@ function renderDeptStats(){
 }
 
 /* ----- Records ----- */
+function clearRecFilter(){
+  const f=document.getElementById('r_filter');if(f)f.value='';
+  const s=document.getElementById('r_search');if(s)s.value='';
+  renderRecords();
+}
+// 单人历史到岗离岗汇总面板（筛选出唯一成员时显示）
+function renderPersonHistory(memberId){
+  const box=document.getElementById('personHistory');if(!box)return;
+  if(!memberId){box.style.display='none';box.innerHTML='';return;}
+  const m=memberById(memberId);if(!m){box.style.display='none';return;}
+  const st=memberStints(memberId);           // 按到岗日期升序
+  const sum=memberSummary(memberId);
+  const rows=st.map((r,i)=>{
+    const planned=r.end&&r.end>todayStr();
+    const pending=recPending(r);
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${pending?`<span class="tag tag-warn">${r.start}（预计到岗）</span>`:r.start}</td>
+      <td>${r.end?(planned?`<span class="tag tag-warn">${r.end}（预计）</span>`:r.end):'<span style="color:var(--txt-mut)">在岗中</span>'}</td>
+      <td class="num">${recordDays(r)} 天</td>
+      <td>${r.resident===false?'非常驻':'常驻'}</td>
+      <td>${esc(r.note||'-')}</td>
+    </tr>`;
+  }).join('');
+  box.innerHTML=`
+    <div style="background:rgba(232,176,75,.06);border:1px solid rgba(232,176,75,.25);border-radius:12px;padding:15px 17px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:11px">
+        <div style="font-weight:700;font-size:14px">📜 ${esc(m.name)} 的历史到岗离岗记录
+          <span class="pill" style="margin-left:6px">${esc(m.role||'-')} · ${esc(m.dept||'-')}</span></div>
+        <div style="font-size:12.5px;color:var(--txt-dim)">
+          共 <b style="color:var(--gold-soft)">${sum.count}</b> 次到岗 ·
+          首次到岗 <b>${sum.start}</b> ·
+          ${sum.end==='在岗中'?'目前<b style="color:var(--green)">在岗中</b>':'最近离岗 <b>'+sum.end+'</b>'} ·
+          累计在岗 <b style="color:var(--gold-soft)">${sum.days}</b> 天
+        </div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:44px">序号</th><th>到岗日期</th><th>离岗日期</th><th class="num">本段天数</th><th>类型</th><th>备注</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="6"><div class="empty" style="padding:14px">暂无记录</div></td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+  box.style.display='block';
+}
 function renderRecords(){
   const filter=document.getElementById('r_filter').value;
   const kw=(document.getElementById('r_search')?document.getElementById('r_search').value:'').trim().toLowerCase();
   let recs=[...db.records].sort((a,b)=>b.start.localeCompare(a.start));
   if(filter)recs=recs.filter(r=>r.member===filter);
   if(kw)recs=recs.filter(r=>{const m=memberById(r.member);return m&&m.name.toLowerCase().includes(kw);});
+  // 确定唯一目标成员：下拉选中，或搜索恰好命中一人
+  let target='';
+  if(filter)target=filter;
+  else if(kw){
+    const hit=db.members.filter(m=>m.name.toLowerCase().includes(kw));
+    if(hit.length===1)target=hit[0].id;
+  }
+  renderPersonHistory(target);
   const b=document.getElementById('recordBody');
   if(!recs.length){b.innerHTML='<tr><td colspan="9"><div class="empty"><div class="big">📅</div>无匹配记录</div></td></tr>';return;}
   b.innerHTML=recs.map(r=>{
